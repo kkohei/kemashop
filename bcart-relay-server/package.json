@@ -1,0 +1,20 @@
+{
+  "name": "bcart-relay-server",
+  "version": "0.1.0",
+  "description": "Bカート Webhook を受信し、iOSアプリへ APNs プッシュ通知を送る中継サーバー(PoC)",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "dotenv": "^16.4.0",
+    "express": "^4.19.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
