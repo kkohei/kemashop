@@ -5,7 +5,8 @@ import path from 'node:path';
 import { config } from './config.js';
 import { store } from './db.js';
 import { sendPushToTokens } from './apns.js';
-import { fetchOrder, extractOrderInfo } from './bcart.js';
+// bcart.js(受注API取得)は再入荷ポーリング等の将来拡張用。
+// 受注イベントの会員ID・出荷状況は Webhook ボディに含まれるため、ここでは未使用。
 
 const app = express();
 
@@ -114,9 +115,9 @@ app.post('/webhook/bcart', async (req, res) => {
 
   try {
     const event = req.body || {};
-    const eventType = event.event_type || event.event || event.type || 'unknown';
-    // 冪等キー(Bカートは idempotency_key を付与する)
-    const eventKey = event.idempotency_key || event.event_id || `${eventType}:${event?.data?.object?.id}`;
+    const eventType = event.event_type || 'unknown';
+    // 冪等キー: Bカートの idempotency_key は null のことがあるため event_id(UUID)を優先
+    const eventKey = event.event_id || event.idempotency_key || `${eventType}:${event?.data?.object?.id}`;
 
     if (store.isDuplicateEvent(eventKey)) {
       console.log('[webhook] 重複スキップ:', eventKey);
@@ -130,32 +131,41 @@ app.post('/webhook/bcart', async (req, res) => {
 });
 
 // イベント種別ごとの処理。
-// TODO(フェーズ0): event_type の実値(受注の新規/更新を表す文字列)をキャプチャで確認し、
-//   下の startsWith 判定を実値に合わせて確定する。
+// Bカートの実ペイロード(確定)に基づく:
+//   - event_type: 'order.created' / 'order.updated'
+//   - 会員ID:   data.object.customer_id
+//   - 出荷状況: data.object.logistics[].status === '発送済'
+//   - 受注番号: data.object.code
 async function handleEvent(eventType, event) {
-  const objectId = event?.data?.object?.id;
+  const order = event?.data?.object;
+  if (!order) return;
 
-  // 受注関連イベント
-  if (/order|受注/i.test(eventType)) {
-    // Webhookは object.id のみ通知 → APIで詳細(会員ID・出荷ステータス)を取得
-    const order = await fetchOrder(objectId);
-    const { memberId, shippingStatus } = extractOrderInfo(order);
-
-    // 出荷ステータスが「未発送」以外になった = 出荷完了とみなす(値はフェーズ0で確定)
-    const isShipped = shippingStatus && shippingStatus !== '未発送';
-    const isNew = /created|new|新規/i.test(eventType);
+  if (eventType === 'order.created' || eventType === 'order.updated') {
+    const memberId = order.customer_id;
+    const shipped =
+      Array.isArray(order.logistics) && order.logistics.some((l) => l.status === '発送済');
 
     let message = null;
-    if (isShipped) {
-      message = { title: '出荷しました', body: 'ご注文の商品を発送しました。', data: { url: '/order/history' } };
-    } else if (isNew) {
-      message = { title: 'ご注文を承りました', body: 'ご注文ありがとうございます。', data: { url: '/order/history' } };
+    if (eventType === 'order.created') {
+      message = {
+        title: 'ご注文を承りました',
+        body: 'ご注文ありがとうございます。内容をご確認ください。',
+        data: { url: '/order/history', orderId: order.id },
+      };
+    } else if (shipped && !store.isDuplicateEvent(`shipped:${order.id}`)) {
+      // order.updated は編集の度に飛ぶため、出荷通知は1受注につき1回だけ送る
+      message = {
+        title: '出荷しました',
+        body: `ご注文(No.${order.code})を発送しました。`,
+        data: { url: '/order/history', orderId: order.id },
+      };
     }
 
     await pushToMember(memberId, message, eventType);
     return;
   }
 
+  // 会員・配送先イベント等は現状通知対象外(必要になれば追加)
   console.log('[webhook] 通知対象外のイベント:', eventType);
 }
 
