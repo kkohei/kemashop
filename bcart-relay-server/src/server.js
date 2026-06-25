@@ -141,7 +141,8 @@ async function handleEvent(eventType, event) {
   if (!order) return;
 
   if (eventType === 'order.created' || eventType === 'order.updated') {
-    const memberId = order.customer_id;
+    // 端末は customer_id でも email でも登録され得るため、両方のキーで照合する
+    const keys = [order.customer_id, order.customer_email].filter(Boolean);
     const shipped =
       Array.isArray(order.logistics) && order.logistics.some((l) => l.status === '発送済');
 
@@ -161,7 +162,7 @@ async function handleEvent(eventType, event) {
       };
     }
 
-    await pushToMember(memberId, message, eventType);
+    await pushToKeys(keys, message, eventType);
     return;
   }
 
@@ -169,19 +170,28 @@ async function handleEvent(eventType, event) {
   console.log('[webhook] 通知対象外のイベント:', eventType);
 }
 
-async function pushToMember(memberId, message, eventType) {
-  if (!memberId || !message) {
-    console.log('[webhook] 送信なし type=', eventType, 'member=', memberId);
+// 複数キー(customer_id / email)に紐づく端末トークンを重複なく集める
+function tokensForKeys(keys) {
+  const set = new Set();
+  for (const k of keys) {
+    for (const t of store.tokensForMember(String(k))) set.add(t);
+  }
+  return [...set];
+}
+
+async function pushToKeys(keys, message, eventType) {
+  if (!keys.length || !message) {
+    console.log('[webhook] 送信なし type=', eventType, 'keys=', keys);
     return;
   }
-  const tokens = store.tokensForMember(memberId);
+  const tokens = tokensForKeys(keys);
   if (tokens.length === 0) {
-    console.log('[webhook] 端末未登録 member=', memberId);
+    console.log('[webhook] 端末未登録 keys=', keys);
     return;
   }
   const { invalid } = await sendPushToTokens(tokens, message);
   invalid.forEach((t) => store.removeToken(t));
-  console.log(`[webhook] 送信 type=${eventType} member=${memberId} 端末=${tokens.length}`);
+  console.log(`[webhook] 送信 type=${eventType} keys=${keys.join(',')} 端末=${tokens.length}`);
 }
 
 app.listen(config.port, () => {
