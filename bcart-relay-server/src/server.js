@@ -47,9 +47,8 @@ app.post('/push/test', async (req, res) => {
 
 // ---- Webhook 署名検証 ----
 // Bカートは `Bcart-Signature: date=...,v1=<hex>` ヘッダーを付与する。
-// TODO(フェーズ0): 署名対象文字列の正確な仕様を公式ドキュメントで確認する。
-//   ここでは Stripe 型 `${date}.${rawBody}` を HMAC-SHA256 する想定で仮実装。
-//   実仕様が判明したら makeSigningString を差し替える。
+// 公式仕様(確定): date の値と Webhookボディを `.` で連結した文字列を、
+// 管理画面で登録した Secret をキーに HMAC-SHA256 した hex 値が v1 と一致すれば正当。
 function makeSigningString(date, rawBody) {
   return `${date}.${rawBody}`;
 }
