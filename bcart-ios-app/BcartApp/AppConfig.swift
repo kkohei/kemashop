@@ -2,8 +2,8 @@ import Foundation
 
 /// アプリ全体の設定。実値は環境に合わせて変更する。
 enum AppConfig {
-    /// Bカートの買い手向けサイトURL(あなたのショップのURLに変更)
-    static let bcartURL = URL(string: "https://your-shop.bcart.jp/")!
+    /// Bカートの買い手向けサイトURL
+    static let bcartURL = URL(string: "https://kema.i17.bcart.jp/")!
 
     /// 中継サーバー(XServer VPS)のベースURL
     static let relayBaseURL = URL(string: "https://relay.kema.hair")!
