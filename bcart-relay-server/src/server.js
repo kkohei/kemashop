@@ -151,14 +151,14 @@ async function handleEvent(eventType, event) {
       message = {
         title: 'ご注文を承りました',
         body: 'ご注文ありがとうございます。内容をご確認ください。',
-        data: { url: '/order/history', orderId: order.id },
+        data: { url: '/mypage.php', orderId: order.id },
       };
     } else if (shipped && !store.isDuplicateEvent(`shipped:${order.id}`)) {
       // order.updated は編集の度に飛ぶため、出荷通知は1受注につき1回だけ送る
       message = {
         title: '出荷しました',
         body: `ご注文(No.${order.code})を発送しました。`,
-        data: { url: '/order/history', orderId: order.id },
+        data: { url: '/mypage.php', orderId: order.id },
       };
     }
 
