@@ -12,4 +12,9 @@ enum AppConfig {
     /// ログイン後にのみ現れるパス(例: マイページ)を含むかで判定する。
     /// TODO: 実際のBカートのログイン後URLに合わせて調整。
     static let loggedInPathHints = ["/mypage", "/order", "/member"]
+
+    // 下部バーのボタンが開くパス(bcartURL からの相対パス)
+    // TODO: 実際のBカートのURLに合わせて確定する。
+    static let loginPath = "/login/"        // ログイン画面
+    static let orderHistoryPath = "/order/" // 注文履歴
 }
