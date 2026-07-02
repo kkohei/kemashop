@@ -91,11 +91,12 @@ struct WelcomeView: View {
 /// 流れ続けるゴールド×ピンクゴールドの背景。
 /// MeshGradient の格子点を TimelineView で常時サイン波で動かし、有機的に流れる効果を出す。
 struct FlowingGoldBackground: View {
-    private let paleGold  = Color(red: 0.98, green: 0.92, blue: 0.78)
-    private let lightGold = Color(red: 0.96, green: 0.87, blue: 0.66)
-    private let gold      = Color(red: 0.85, green: 0.67, blue: 0.32)
-    private let roseGold  = Color(red: 0.91, green: 0.72, blue: 0.66)
-    private let deepGold  = Color(red: 0.72, green: 0.52, blue: 0.30)
+    // 濃いめ・深みのあるゴールド × ピンクゴールド
+    private let paleGold  = Color(red: 0.89, green: 0.74, blue: 0.42)
+    private let lightGold = Color(red: 0.82, green: 0.63, blue: 0.26)
+    private let gold      = Color(red: 0.72, green: 0.52, blue: 0.16)
+    private let roseGold  = Color(red: 0.78, green: 0.52, blue: 0.40)
+    private let deepGold  = Color(red: 0.50, green: 0.35, blue: 0.13)
 
     var body: some View {
         if #available(iOS 18.0, *) {
