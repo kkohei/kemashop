@@ -28,44 +28,79 @@ struct RootView: View {
     }
 }
 
-/// 初回起動画面: KEMAロゴ + 新規登録ボタン + ログインリンク。
+/// 初回起動画面:
+/// 動くゴールド×ピンクゴールドのグラデーション背景 + 中央ロゴ + PRO SHOP + ログイン/新規登録ボタン。
 struct WelcomeView: View {
     @EnvironmentObject var appState: AppState
+    @State private var animate = false
+
+    // ゴールド〜ピンクゴールドの配色
+    private let lightGold = Color(red: 0.96, green: 0.87, blue: 0.66)
+    private let gold      = Color(red: 0.85, green: 0.67, blue: 0.32)
+    private let roseGold  = Color(red: 0.91, green: 0.72, blue: 0.66)
+    private let deepGold  = Color(red: 0.72, green: 0.52, blue: 0.30)
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            // ロゴ(画像に差し替える場合は Image("logo") に変更)
-            VStack(spacing: 6) {
-                Text("KEMA")
-                    .font(.system(size: 46, weight: .bold))
-                    .tracking(6)
-                Text("SHOP")
-                    .font(.system(size: 18, weight: .medium))
-                    .tracking(10)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            VStack(spacing: 18) {
-                Button {
-                    appState.open(path: AppConfig.registerPath)
-                } label: {
-                    Text("新規登録")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+        ZStack {
+            // 動くグラデーション背景
+            LinearGradient(
+                colors: [lightGold, gold, roseGold, deepGold],
+                startPoint: animate ? .topLeading : .bottomTrailing,
+                endPoint: animate ? .bottomTrailing : .topLeading
+            )
+            .ignoresSafeArea()
+            .onAppear {
+                withAnimation(.easeInOut(duration: 7).repeatForever(autoreverses: true)) {
+                    animate = true
                 }
-                .buttonStyle(.borderedProminent)
+            }
 
-                Button {
-                    appState.open(path: AppConfig.loginPath)
-                } label: {
-                    Text("ログインはこちら")
-                        .font(.subheadline)
+            VStack(spacing: 0) {
+                Spacer()
+
+                // ロゴ(Assets に "logo" 画像を追加してください)
+                Image("logo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 200)
+                    .padding(.bottom, 14)
+
+                Text("PRO SHOP")
+                    .font(.system(size: 20, weight: .semibold))
+                    .tracking(8)
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                VStack(spacing: 14) {
+                    // ログイン(白ボタン)
+                    Button {
+                        appState.open(path: AppConfig.loginPath)
+                    } label: {
+                        Text("ログイン")
+                            .font(.headline)
+                            .foregroundStyle(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 15)
+                            .background(.white, in: Capsule())
+                    }
+
+                    // 新規登録(白枠ボタン)
+                    Button {
+                        appState.open(path: AppConfig.registerPath)
+                    } label: {
+                        Text("新規登録")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 15)
+                            .background(.white.opacity(0.12), in: Capsule())
+                            .overlay(Capsule().stroke(.white.opacity(0.9), lineWidth: 1.5))
+                    }
                 }
+                .padding(.horizontal, 40)
+                .padding(.bottom, 50)
             }
-            .padding(.horizontal, 40)
-            .padding(.bottom, 50)
         }
     }
 }
