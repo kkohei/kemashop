@@ -30,14 +30,17 @@ struct BcartWebView: UIViewRepresentable {
         refresh.addTarget(context.coordinator, action: #selector(Coordinator.reload), for: .valueChanged)
         webView.scrollView.refreshControl = refresh
 
-        // 認証情報が保存済みなら、ログイン画面を開いて自動ログインを試みる
+        // 認証情報が保存済みなら常にログイン画面を開いて自動ログイン。
+        // 未登録なら Welcome 画面で選ばれたパス(新規登録/ログイン/ホーム)を開く。
+        let start: String
         if KeychainStore.hasCredentials {
             context.coordinator.pendingAutoLogin = true
-            let url = URL(string: AppConfig.loginPath, relativeTo: AppConfig.bcartURL)!
-            webView.load(URLRequest(url: url))
+            start = AppConfig.loginPath
         } else {
-            webView.load(URLRequest(url: AppConfig.bcartURL))
+            start = appState.startPath.isEmpty ? "/" : appState.startPath
         }
+        let url = URL(string: start, relativeTo: AppConfig.bcartURL) ?? AppConfig.bcartURL
+        webView.load(URLRequest(url: url))
         return webView
     }
 

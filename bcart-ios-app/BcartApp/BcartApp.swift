@@ -1,7 +1,7 @@
 import SwiftUI
+import Combine
 
-/// アプリのエントリポイント。
-/// APNs(プッシュ通知)のために AppDelegate を併用する。
+/// アプリのエントリポイント。APNs のために AppDelegate を併用する。
 @main
 struct BcartApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -15,18 +15,37 @@ struct BcartApp: App {
     }
 }
 
+/// 画面の状態。
+enum AppRoute {
+    case welcome  // 初回: ロゴ + 新規登録/ログイン
+    case locked   // 再訪: Face IDロック
+    case web      // WebView表示
+}
+
 /// アプリ横断の状態。
 final class AppState: ObservableObject {
-    /// 生体認証によるロック解除済みか
-    @Published var isUnlocked = false
-    /// プッシュ通知タップで開きたいパス(WebViewへ反映)
-    @Published var pendingDeepLinkPath: String?
-    /// ログイン中の会員を識別するキー(email を採用。customer_id でも可)
+    @Published var route: AppRoute
+    /// WebViewが最初に開くパス(Welcome画面のボタンで設定)
+    @Published var startPath: String
+    /// ログイン中の会員を識別するキー(email)
     @Published var memberKey: String? {
         didSet { if let memberKey { KeychainStore.saveMemberKey(memberKey) } }
     }
 
     init() {
         memberKey = KeychainStore.loadMemberKey()
+        if KeychainStore.hasCredentials {
+            route = .locked          // 登録済み → Face ID
+            startPath = AppConfig.loginPath
+        } else {
+            route = .welcome         // 初回 → ロゴ画面
+            startPath = "/"
+        }
+    }
+
+    /// 指定パスをWebViewで開く(Welcome画面のボタンから使用)
+    func open(path: String) {
+        startPath = path
+        route = .web
     }
 }

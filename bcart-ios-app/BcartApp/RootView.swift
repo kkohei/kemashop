@@ -1,32 +1,76 @@
 import SwiftUI
 
-/// ルート画面。生体認証で解錠するまではロック画面を表示する。
-/// 解錠後は WebView + 下部のナビゲーションバー(ホーム/ログイン/注文履歴)を表示。
+/// ルート画面。状態に応じて Welcome / ロック / WebView を切り替える。
 struct RootView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        ZStack {
-            if appState.isUnlocked {
+        Group {
+            switch appState.route {
+            case .welcome:
+                WelcomeView()
+            case .locked:
+                LockView()
+            case .web:
                 VStack(spacing: 0) {
                     BcartWebView()
                     BottomBar()
                 }
-            } else {
-                LockView()
             }
         }
         .onChange(of: scenePhase) { newPhase in
-            // バックグラウンドへ移動したら再ロック(復帰時に再度Face IDを要求)
-            if newPhase == .background {
-                appState.isUnlocked = false
+            // バックグラウンドへ移動したら、認証情報がある場合は再ロック
+            if newPhase == .background, KeychainStore.hasCredentials {
+                appState.route = .locked
             }
         }
     }
 }
 
-/// 下部の常設ナビゲーションバー。ログインをいつでも1タップで開ける。
+/// 初回起動画面: KEMAロゴ + 新規登録ボタン + ログインリンク。
+struct WelcomeView: View {
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            // ロゴ(画像に差し替える場合は Image("logo") に変更)
+            VStack(spacing: 6) {
+                Text("KEMA")
+                    .font(.system(size: 46, weight: .bold))
+                    .tracking(6)
+                Text("SHOP")
+                    .font(.system(size: 18, weight: .medium))
+                    .tracking(10)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(spacing: 18) {
+                Button {
+                    appState.open(path: AppConfig.registerPath)
+                } label: {
+                    Text("新規登録")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button {
+                    appState.open(path: AppConfig.loginPath)
+                } label: {
+                    Text("ログインはこちら")
+                        .font(.subheadline)
+                }
+            }
+            .padding(.horizontal, 40)
+            .padding(.bottom, 50)
+        }
+    }
+}
+
+/// WebView下部の常設ナビゲーションバー。
 struct BottomBar: View {
     var body: some View {
         HStack(alignment: .center) {
@@ -42,7 +86,6 @@ struct BottomBar: View {
     }
 }
 
-/// 下部バーの1ボタン。タップでWebViewを該当パスへ遷移させる。
 struct BarButton: View {
     let title: String
     let systemImage: String
@@ -86,7 +129,7 @@ struct LockView: View {
 
     private func unlock() {
         BiometricGate.authenticate { success in
-            if success { appState.isUnlocked = true }
+            if success { appState.route = .web }
         }
     }
 }
