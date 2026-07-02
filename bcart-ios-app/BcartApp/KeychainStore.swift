@@ -1,19 +1,32 @@
 import Foundation
 import Security
 
-/// 会員キー(email等)を Keychain に安全に保存する。
-/// ※方式A(Cookie保持)ではパスワードは保存しない。保存するのは識別子のみ。
+/// ログイン認証情報(メール+パスワード)を Keychain に安全に保存する。
+/// アプリ自体を Face ID でロックした上で、この認証情報を使って自動ログインする(方式B)。
 enum KeychainStore {
-    private static let service = "jp.example.bcart"
-    private static let memberKeyAccount = "memberKey"
+    private static let service = "kema.Bcartapp"
+    private static let emailAccount = "email"
+    private static let passwordAccount = "password"
 
-    static func saveMemberKey(_ value: String) {
-        save(account: memberKeyAccount, value: value)
+    /// メール+パスワードを保存
+    static func saveCredentials(email: String, password: String) {
+        save(account: emailAccount, value: email)
+        save(account: passwordAccount, value: password)
     }
 
-    static func loadMemberKey() -> String? {
-        load(account: memberKeyAccount)
+    /// 保存済みの認証情報を取得(無ければ nil)
+    static func loadCredentials() -> (email: String, password: String)? {
+        guard let e = load(account: emailAccount),
+              let p = load(account: passwordAccount) else { return nil }
+        return (e, p)
     }
+
+    /// 認証情報が保存済みか
+    static var hasCredentials: Bool { load(account: passwordAccount) != nil }
+
+    // 会員キー(= email)。端末登録に使用。
+    static func loadMemberKey() -> String? { load(account: emailAccount) }
+    static func saveMemberKey(_ value: String) { save(account: emailAccount, value: value) }
 
     // MARK: - 汎用
 
@@ -27,7 +40,7 @@ enum KeychainStore {
         SecItemDelete(query as CFDictionary)
         var attributes = query
         attributes[kSecValueData as String] = data
-        attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        attributes[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         SecItemAdd(attributes as CFDictionary, nil)
     }
 

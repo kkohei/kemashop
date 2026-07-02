@@ -2,8 +2,8 @@ import SwiftUI
 import WebKit
 
 /// Bカートを表示する WKWebView。
-/// - 永続データストアでログインCookie(「ログイン状態を保存する」)を保持(方式A)
-/// - ログインフォーム送信時にメールアドレスを捕捉し、会員キーとして登録
+/// - ログインフォーム送信時に メール+パスワード を捕捉し Keychain に保存
+/// - 起動時、保存済み認証情報があればログイン画面を開いて自動入力・自動送信(方式B: Face IDでログイン)
 /// - プッシュ通知タップ時のディープリンクで該当ページへ遷移
 struct BcartWebView: UIViewRepresentable {
     @EnvironmentObject var appState: AppState
@@ -14,11 +14,11 @@ struct BcartWebView: UIViewRepresentable {
         let controller = WKUserContentController()
         controller.add(context.coordinator, name: "memberCapture")
         controller.addUserScript(
-            WKUserScript(source: Self.captureJS, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
+            WKUserScript(source: Coordinator.captureJS, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
         )
 
         let config = WKWebViewConfiguration()
-        config.websiteDataStore = .default() // 永続Cookie(ログイン保持)
+        config.websiteDataStore = .default() // 永続Cookie
         config.userContentController = controller
 
         let webView = WKWebView(frame: .zero, configuration: config)
@@ -30,7 +30,14 @@ struct BcartWebView: UIViewRepresentable {
         refresh.addTarget(context.coordinator, action: #selector(Coordinator.reload), for: .valueChanged)
         webView.scrollView.refreshControl = refresh
 
-        webView.load(URLRequest(url: AppConfig.bcartURL))
+        // 認証情報が保存済みなら、ログイン画面を開いて自動ログインを試みる
+        if KeychainStore.hasCredentials {
+            context.coordinator.pendingAutoLogin = true
+            let url = URL(string: AppConfig.loginPath, relativeTo: AppConfig.bcartURL)!
+            webView.load(URLRequest(url: url))
+        } else {
+            webView.load(URLRequest(url: AppConfig.bcartURL))
+        }
         return webView
     }
 
@@ -39,6 +46,7 @@ struct BcartWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         let appState: AppState
         weak var webView: WKWebView?
+        var pendingAutoLogin = false
 
         init(appState: AppState) {
             self.appState = appState
@@ -48,9 +56,7 @@ struct BcartWebView: UIViewRepresentable {
             )
         }
 
-        @objc func reload() {
-            webView?.reload()
-        }
+        @objc func reload() { webView?.reload() }
 
         @objc func handleDeepLink(_ note: Notification) {
             guard let path = note.object as? String,
@@ -58,46 +64,78 @@ struct BcartWebView: UIViewRepresentable {
             webView?.load(URLRequest(url: url))
         }
 
-        // JS からメールアドレスを受け取り、会員キーとして登録
+        // ログインフォーム送信時に メール+パスワード を受け取り保存
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
             guard message.name == "memberCapture",
-                  let email = (message.body as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !email.isEmpty else { return }
+                  let dict = message.body as? [String: Any],
+                  let email = (dict["email"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  let password = dict["password"] as? String,
+                  !email.isEmpty, !password.isEmpty else { return }
+            KeychainStore.saveCredentials(email: email, password: password)
             appState.memberKey = email
             DeviceRegistration.registerIfPossible()
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             webView.scrollView.refreshControl?.endRefreshing()
-            // ログイン後ページに到達したら(会員キーが既知なら)端末登録を試みる
-            if let path = webView.url?.path,
-               AppConfig.loggedInPathHints.contains(where: { path.contains($0) }) {
+            let path = webView.url?.path ?? ""
+
+            // 自動ログイン: ログイン画面が開いたら、保存済み認証情報を入力して送信
+            if pendingAutoLogin, path.contains("login"), let cred = KeychainStore.loadCredentials() {
+                pendingAutoLogin = false
+                webView.evaluateJavaScript(Self.autoLoginJS(email: cred.email, password: cred.password))
+            }
+
+            // ログイン後ページに到達したら端末登録を試みる
+            if AppConfig.loggedInPathHints.contains(where: { path.contains($0) }) {
                 DeviceRegistration.registerIfPossible()
             }
         }
-    }
 
-    /// ログインフォーム送信時にメールアドレスを捕捉するJS。
-    /// input[type=email] か name/id に "mail" を含む入力の値を読む。
-    /// TODO: 実際のBカートのログインフォームのフィールド名に合わせて精緻化。
-    static let captureJS = """
-    (function(){
-      function findEmail(){
-        var inputs = document.querySelectorAll('input');
-        for (var i=0;i<inputs.length;i++){
-          var el = inputs[i];
-          var t = (el.type||'').toLowerCase();
-          var n = ((el.name||'')+(el.id||'')).toLowerCase();
-          if (t==='email' || n.indexOf('mail')>=0){
-            if (el.value && el.value.indexOf('@')>0) return el.value.trim();
-          }
+        /// ログインフォームから メール+パスワード を捕捉するJS
+        static let captureJS = """
+        (function(){
+          document.addEventListener('submit', function(){
+            var email=null, pass=null, inputs=document.querySelectorAll('input');
+            for (var i=0;i<inputs.length;i++){
+              var el=inputs[i], t=(el.type||'').toLowerCase(), n=((el.name||'')+(el.id||'')).toLowerCase();
+              if ((t==='email'||n.indexOf('mail')>=0) && el.value && el.value.indexOf('@')>0) email=el.value.trim();
+              if (t==='password' && el.value) pass=el.value;
+            }
+            if (email && pass){ try { window.webkit.messageHandlers.memberCapture.postMessage({email:email, password:pass}); } catch(e){} }
+          }, true);
+        })();
+        """
+
+        /// 保存済み認証情報を入力して送信するJS
+        static func autoLoginJS(email: String, password: String) -> String {
+            return """
+            (function(){
+              var inputs=document.querySelectorAll('input'), ef=null, pf=null;
+              for (var i=0;i<inputs.length;i++){
+                var el=inputs[i], t=(el.type||'').toLowerCase(), n=((el.name||'')+(el.id||'')).toLowerCase();
+                if (!ef && (t==='email'||t==='text'||n.indexOf('mail')>=0)) ef=el;
+                if (!pf && t==='password') pf=el;
+              }
+              if (ef && pf){
+                ef.value=\(jsString(email)); pf.value=\(jsString(password));
+                ef.dispatchEvent(new Event('input',{bubbles:true}));
+                pf.dispatchEvent(new Event('input',{bubbles:true}));
+                var form=pf.form||ef.form;
+                if (form){ if (form.requestSubmit) { form.requestSubmit(); } else { form.submit(); } }
+              }
+            })();
+            """
         }
-        return null;
-      }
-      document.addEventListener('submit', function(){
-        var email = findEmail();
-        if (email){ try { window.webkit.messageHandlers.memberCapture.postMessage(email); } catch(e){} }
-      }, true);
-    })();
-    """
+
+        /// JS文字列リテラルとして安全にエスケープ
+        static func jsString(_ s: String) -> String {
+            let escaped = s
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "'", with: "\\'")
+                .replacingOccurrences(of: "\n", with: "")
+                .replacingOccurrences(of: "\r", with: "")
+            return "'\(escaped)'"
+        }
+    }
 }
