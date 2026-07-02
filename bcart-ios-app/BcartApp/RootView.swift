@@ -29,31 +29,14 @@ struct RootView: View {
 }
 
 /// 初回起動画面:
-/// 動くゴールド×ピンクゴールドのグラデーション背景 + 中央ロゴ + PRO SHOP + ログイン/新規登録ボタン。
+/// 流れ続けるゴールド×ピンクゴールドの背景 + 中央ロゴ + PRO SHOP + ログイン/新規登録ボタン。
 struct WelcomeView: View {
     @EnvironmentObject var appState: AppState
-    @State private var animate = false
-
-    // ゴールド〜ピンクゴールドの配色
-    private let lightGold = Color(red: 0.96, green: 0.87, blue: 0.66)
-    private let gold      = Color(red: 0.85, green: 0.67, blue: 0.32)
-    private let roseGold  = Color(red: 0.91, green: 0.72, blue: 0.66)
-    private let deepGold  = Color(red: 0.72, green: 0.52, blue: 0.30)
 
     var body: some View {
         ZStack {
-            // 動くグラデーション背景
-            LinearGradient(
-                colors: [lightGold, gold, roseGold, deepGold],
-                startPoint: animate ? .topLeading : .bottomTrailing,
-                endPoint: animate ? .bottomTrailing : .topLeading
-            )
-            .ignoresSafeArea()
-            .onAppear {
-                withAnimation(.easeInOut(duration: 7).repeatForever(autoreverses: true)) {
-                    animate = true
-                }
-            }
+            // 常時ゆらゆら流れる背景
+            FlowingGoldBackground()
 
             VStack(spacing: 0) {
                 Spacer()
@@ -102,6 +85,51 @@ struct WelcomeView: View {
                 .padding(.bottom, 50)
             }
         }
+    }
+}
+
+/// 流れ続けるゴールド×ピンクゴールドの背景。
+/// MeshGradient の格子点を TimelineView で常時サイン波で動かし、有機的に流れる効果を出す。
+struct FlowingGoldBackground: View {
+    private let paleGold  = Color(red: 0.98, green: 0.92, blue: 0.78)
+    private let lightGold = Color(red: 0.96, green: 0.87, blue: 0.66)
+    private let gold      = Color(red: 0.85, green: 0.67, blue: 0.32)
+    private let roseGold  = Color(red: 0.91, green: 0.72, blue: 0.66)
+    private let deepGold  = Color(red: 0.72, green: 0.52, blue: 0.30)
+
+    var body: some View {
+        if #available(iOS 18.0, *) {
+            TimelineView(.animation) { timeline in
+                mesh(timeline.date.timeIntervalSinceReferenceDate)
+            }
+            .ignoresSafeArea()
+        } else {
+            // iOS 17 以前のフォールバック(静的グラデーション)
+            LinearGradient(colors: [paleGold, lightGold, roseGold, gold, deepGold],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+                .ignoresSafeArea()
+        }
+    }
+
+    @available(iOS 18.0, *)
+    private func mesh(_ t: TimeInterval) -> some View {
+        func p(_ x: Double, _ y: Double) -> SIMD2<Float> { SIMD2(Float(x), Float(y)) }
+        // 異なる周期のサイン波で格子点を揺らす → ずっと流れ続ける
+        let a = sin(t * 0.45), b = cos(t * 0.37)
+        let c = sin(t * 0.60), d = cos(t * 0.52)
+        return MeshGradient(
+            width: 3, height: 3,
+            points: [
+                p(0, 0),                p(0.5 + 0.10 * a, 0),               p(1, 0),
+                p(0, 0.5 + 0.10 * b),   p(0.5 + 0.12 * c, 0.5 + 0.12 * d),  p(1, 0.5 - 0.10 * b),
+                p(0, 1),                p(0.5 - 0.10 * a, 1),               p(1, 1)
+            ],
+            colors: [
+                paleGold,  lightGold, roseGold,
+                gold,      roseGold,  gold,
+                deepGold,  gold,      lightGold
+            ]
+        )
     }
 }
 
