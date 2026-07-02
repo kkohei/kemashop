@@ -32,6 +32,7 @@ struct BottomBar: View {
         HStack(alignment: .center) {
             BarButton(title: "ホーム", systemImage: "house", path: "/")
             BarButton(title: "ログイン", systemImage: "person.crop.circle", path: AppConfig.loginPath)
+            BarButton(title: "新規登録", systemImage: "person.badge.plus", path: AppConfig.registerPath)
             BarButton(title: "注文履歴", systemImage: "clock.arrow.circlepath", path: AppConfig.orderHistoryPath)
         }
         .padding(.top, 8)

@@ -15,6 +15,7 @@ enum AppConfig {
 
     // 下部バーのボタンが開くパス(bcartURL からの相対パス)
     // TODO: 実際のBカートのURLに合わせて確定する。
-    static let loginPath = "/login.php"        // ログイン画面
+    static let loginPath = "/login.php"         // ログイン画面
+    static let registerPath = "/regist.php"     // 新規会員登録
     static let orderHistoryPath = "/mypage.php" // 注文履歴(マイページ)
 }
