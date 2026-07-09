@@ -152,7 +152,13 @@ struct BcartWebView: UIViewRepresentable {
             select, textarea {
               font-size:16px !important; box-sizing:border-box !important;
               padding:12px !important; border-radius:10px !important;
+              color:#222 !important; background-color:#fff !important;
             }
+            select {
+              -webkit-appearance:menulist !important; appearance:menulist !important;
+              min-height:44px !important;
+            }
+            option { color:#222 !important; background-color:#fff !important; }
             input[type=checkbox], input[type=radio] { transform:scale(1.2); }
             button, input[type=submit], input[type=button] {
               font-size:17px !important; padding:14px 22px !important; border-radius:999px !important;
