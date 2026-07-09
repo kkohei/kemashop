@@ -20,6 +20,10 @@ struct BcartWebView: UIViewRepresentable {
         controller.addUserScript(
             WKUserScript(source: Coordinator.mobileFormJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         )
+        // アプリ内でのみ、新規登録ページの注意書きをモーダルに移して確認ボタンを出す
+        controller.addUserScript(
+            WKUserScript(source: Coordinator.registModalJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        )
 
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default() // 永続Cookie
@@ -158,6 +162,56 @@ struct BcartWebView: UIViewRepresentable {
           s.id = 'app-mobile-style';
           s.textContent = css;
           (document.head || document.documentElement).appendChild(s);
+        })();
+        """
+
+        /// アプリ内でのみ、新規登録ページの「フォームの前にある注意書き」をモーダルに移し、
+        /// 確認ボタンで閉じる。フォーム本体(inputを含む<form>)は絶対に隠さない安全設計。
+        static let registModalJS = """
+        (function(){
+          if ((location.pathname||'').indexOf('regist') < 0) return;
+          function run(){
+            if (document.getElementById('app-regist-modal')) return;
+            var form = document.querySelector('form');
+            if (!form || !form.parentElement) return;
+            var container = form.parentElement;
+            var kids = Array.prototype.slice.call(container.children);
+            var formIdx = kids.indexOf(form);
+            // フォームの直前にある連続したテキストブロックだけを注意書きとみなす
+            var noticeNodes = [];
+            for (var i = formIdx - 1; i >= 0; i--) {
+              var el = kids[i], tag = el.tagName.toLowerCase();
+              if (tag==='script' || tag==='style') continue;
+              var cn = (el.className||'') + ' ' + (el.id||'');
+              if (tag==='header'||tag==='nav'||tag==='footer'||/header|nav|footer|breadcrumb|pankuzu/i.test(cn)) break;
+              var txt = (el.innerText||'').trim();
+              if (!txt) continue;
+              noticeNodes.unshift(el);
+            }
+            var noticeHTML = '';
+            noticeNodes.forEach(function(n){ noticeHTML += n.outerHTML; n.style.display='none'; });
+            if (!noticeHTML) noticeHTML = '<p>新規会員登録を行います。内容をご確認のうえ、お進みください。</p>';
+
+            var overlay = document.createElement('div');
+            overlay.id = 'app-regist-modal';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
+            var card = document.createElement('div');
+            card.style.cssText = 'background:#fff;border-radius:16px;max-width:560px;width:100%;max-height:78%;overflow:auto;padding:22px;-webkit-overflow-scrolling:touch;';
+            var h = document.createElement('div');
+            h.textContent = 'ご確認ください';
+            h.style.cssText = 'font-size:18px;font-weight:700;margin-bottom:12px;color:#222;';
+            var bodyEl = document.createElement('div');
+            bodyEl.innerHTML = noticeHTML;
+            bodyEl.style.cssText = 'font-size:15px;line-height:1.7;color:#333;';
+            var btn = document.createElement('button');
+            btn.textContent = '確認して登録に進む';
+            btn.style.cssText = 'margin-top:18px;width:100%;padding:15px;border:none;border-radius:999px;background:linear-gradient(135deg,#b8860b,#8b6914);color:#fff;font-size:16px;font-weight:700;';
+            btn.addEventListener('click', function(){ var o=document.getElementById('app-regist-modal'); if(o) o.remove(); });
+            card.appendChild(h); card.appendChild(bodyEl); card.appendChild(btn);
+            overlay.appendChild(card);
+            document.body.appendChild(overlay);
+          }
+          if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', run); } else { run(); }
         })();
         """
 
