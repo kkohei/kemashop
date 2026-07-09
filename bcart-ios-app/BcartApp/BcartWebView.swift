@@ -142,34 +142,17 @@ struct BcartWebView: UIViewRepresentable {
           var p = location.pathname || '';
           if (p.indexOf('regist') < 0 && p.indexOf('login') < 0) return;
           if (document.getElementById('app-mobile-style')) return;
+          // 安全な最小CSS: 何も隠さず、入力欄とボタンを見やすく大きくするだけ
           var css = `
-            :root { -webkit-text-size-adjust: 100%; }
-            body { background:#f7f3ea !important; margin:0 !important; color:#2a2a2a !important; }
-            header, footer, #header, #footer, .header, .footer,
-            .global-header, .global-footer, .gnav, .g-nav, .breadcrumb, .pankuzu { display:none !important; }
-            #container, .container, main, #main, .contents, #contents {
-              padding:18px !important; max-width:640px !important; margin:0 auto !important;
+            input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]),
+            select, textarea {
+              font-size:16px !important; box-sizing:border-box !important;
+              padding:12px !important; border-radius:10px !important;
             }
-            h1,h2,h3 { font-size:22px !important; font-weight:700 !important; margin:8px 0 18px !important; }
-            input, select, textarea {
-              font-size:16px !important; width:100% !important; box-sizing:border-box !important;
-              padding:14px !important; margin:6px 0 16px !important;
-              border:1px solid #dcd2b8 !important; border-radius:12px !important;
-              background:#fff !important; -webkit-appearance:none !important;
+            input[type=checkbox], input[type=radio] { transform:scale(1.2); }
+            button, input[type=submit], input[type=button] {
+              font-size:17px !important; padding:14px 22px !important; border-radius:999px !important;
             }
-            input[type=checkbox], input[type=radio] {
-              width:auto !important; margin:0 8px 0 0 !important; padding:0 !important; transform:scale(1.3);
-            }
-            button, input[type=submit], input[type=button], .btn, a.btn, a.button {
-              width:100% !important; font-size:17px !important; font-weight:700 !important;
-              padding:16px !important; border-radius:999px !important; border:none !important;
-              background:linear-gradient(135deg,#b8860b,#8b6914) !important; color:#fff !important;
-              margin:12px 0 !important; display:block !important; text-align:center !important;
-              box-shadow:0 4px 12px rgba(139,105,20,0.25) !important;
-            }
-            table, tbody, tr, td, th { display:block !important; width:100% !important; box-sizing:border-box !important; }
-            th { padding:6px 0 2px !important; font-weight:600 !important; text-align:left !important; font-size:14px !important; color:#6a5a2a !important; }
-            td { padding:0 !important; }
           `;
           var s = document.createElement('style');
           s.id = 'app-mobile-style';
