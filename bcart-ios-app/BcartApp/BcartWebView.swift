@@ -170,27 +170,38 @@ struct BcartWebView: UIViewRepresentable {
         static let registModalJS = """
         (function(){
           if ((location.pathname||'').indexOf('regist') < 0) return;
+          function hasField(el){ return el && el.querySelector && !!el.querySelector('input:not([type=hidden]),select,textarea'); }
+          // 目印テキストを直接含む要素を探す
+          function findNoticeStart(){
+            var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+            var n;
+            while (n = w.nextNode()) {
+              var v = n.nodeValue || '';
+              if (v.indexOf('必ずご確認') >= 0 || v.indexOf('登録フォームを入力前') >= 0) return n.parentElement;
+            }
+            return null;
+          }
           function run(){
             if (document.getElementById('app-regist-modal')) return;
-            var form = document.querySelector('form');
-            if (!form || !form.parentElement) return;
-            var container = form.parentElement;
-            var kids = Array.prototype.slice.call(container.children);
-            var formIdx = kids.indexOf(form);
-            // フォームの直前にある連続したテキストブロックだけを注意書きとみなす
+            var start = findNoticeStart();
             var noticeNodes = [];
-            for (var i = formIdx - 1; i >= 0; i--) {
-              var el = kids[i], tag = el.tagName.toLowerCase();
-              if (tag==='script' || tag==='style') continue;
-              var cn = (el.className||'') + ' ' + (el.id||'');
-              if (tag==='header'||tag==='nav'||tag==='footer'||/header|nav|footer|breadcrumb|pankuzu/i.test(cn)) break;
-              var txt = (el.innerText||'').trim();
-              if (!txt) continue;
-              noticeNodes.unshift(el);
+            if (start) {
+              // 入力欄を含まない最大の親ブロックまで引き上げる(フィールドは絶対に含めない)
+              while (start.parentElement && start.parentElement !== document.body && !hasField(start.parentElement)) {
+                start = start.parentElement;
+              }
+              // start と、それに続く「入力欄を含まない」兄弟を注意書きとして集める
+              var sib = start;
+              while (sib) {
+                if (hasField(sib)) break;
+                var next = sib.nextElementSibling;
+                noticeNodes.push(sib);
+                sib = next;
+              }
             }
             var noticeHTML = '';
             noticeNodes.forEach(function(n){ noticeHTML += n.outerHTML; n.style.display='none'; });
-            if (!noticeHTML) noticeHTML = '<p>新規会員登録を行います。内容をご確認のうえ、お進みください。</p>';
+            if (!noticeHTML) noticeHTML = '<p>新規会員登録の前に、ご登録に関するご案内をご確認ください。</p>';
 
             var overlay = document.createElement('div');
             overlay.id = 'app-regist-modal';
