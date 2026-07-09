@@ -149,14 +149,17 @@ struct BcartWebView: UIViewRepresentable {
           // 安全な最小CSS: 何も隠さず、入力欄とボタンを見やすく大きくするだけ
           var css = `
             input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]),
-            select, textarea {
+            textarea {
               font-size:16px !important; box-sizing:border-box !important;
               padding:12px !important; border-radius:10px !important;
               color:#222 !important; background-color:#fff !important;
             }
             select {
+              font-size:16px !important; box-sizing:border-box !important;
+              color:#222 !important; background-color:#fff !important;
+              height:48px !important; line-height:1.4 !important;
+              padding:6px 12px !important; border-radius:10px !important;
               -webkit-appearance:menulist !important; appearance:menulist !important;
-              min-height:44px !important;
             }
             option { color:#222 !important; background-color:#fff !important; }
             input[type=checkbox], input[type=radio] { transform:scale(1.2); }
