@@ -20,10 +20,6 @@ struct BcartWebView: UIViewRepresentable {
         controller.addUserScript(
             WKUserScript(source: Coordinator.mobileFormJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         )
-        // アプリ内でのみ、新規登録ページの注意書きをモーダルに移して確認ボタンを出す
-        controller.addUserScript(
-            WKUserScript(source: Coordinator.registModalJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
-        )
 
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default() // 永続Cookie
