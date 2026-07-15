@@ -21,19 +21,30 @@ function providerToken() {
   return cachedToken;
 }
 
-function apnsHost() {
-  return config.apns.production
+function hostFor(production) {
+  return production
     ? 'https://api.push.apple.com'
     : 'https://api.sandbox.push.apple.com';
 }
 
 /**
  * 1台のデバイスへプッシュを送る。
+ * まず設定環境(本番/サンドボックス)へ送り、トークンの環境違い(BadDeviceToken)なら反対環境で再試行する。
+ * これで開発ビルド(サンドボックス)とTestFlight/App Storeビルド(本番)の両方に届く。
  * @returns {Promise<{ok: boolean, status: number, reason?: string, deviceToken: string}>}
  */
-export function sendPush(deviceToken, { title, body, badge, data = {} }) {
+export async function sendPush(deviceToken, message) {
+  const primary = config.apns.production;
+  let res = await sendToHost(hostFor(primary), deviceToken, message);
+  if (!res.ok && (res.reason === 'BadDeviceToken' || res.status === 400)) {
+    res = await sendToHost(hostFor(!primary), deviceToken, message);
+  }
+  return res;
+}
+
+function sendToHost(host, deviceToken, { title, body, badge, data = {} }) {
   return new Promise((resolve) => {
-    const client = http2.connect(apnsHost());
+    const client = http2.connect(host);
     client.on('error', (err) => {
       resolve({ ok: false, status: 0, reason: err.message, deviceToken });
     });
