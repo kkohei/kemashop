@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 
 /// ルート画面。状態に応じて Welcome / ロック / WebView を切り替える。
 struct RootView: View {
@@ -176,6 +177,11 @@ struct SettingsView: View {
         NavigationView {
             List {
                 Section(header: Text("アカウント")) {
+                    Button {
+                        logout()
+                    } label: {
+                        Label("ログアウト（最初の画面に戻る）", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
                     Button(role: .destructive) {
                         showConfirm = true
                     } label: {
@@ -213,6 +219,19 @@ struct SettingsView: View {
             deviceToken: PushTokenStore.shared.deviceToken
         )
         done = true
+    }
+
+    /// ログアウト: 保存した認証情報とWebViewのログインCookieを消し、最初のWelcome画面に戻る。
+    private func logout() {
+        KeychainStore.clearCredentials()
+        appState.memberKey = nil
+        let types = WKWebsiteDataStore.allWebsiteDataTypes()
+        let store = WKWebsiteDataStore.default()
+        store.fetchDataRecords(ofTypes: types) { records in
+            store.removeData(ofTypes: types, for: records) {}
+        }
+        appState.route = .welcome
+        dismiss()
     }
 }
 

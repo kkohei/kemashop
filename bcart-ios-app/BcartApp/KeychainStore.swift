@@ -24,6 +24,12 @@ enum KeychainStore {
     /// 認証情報が保存済みか
     static var hasCredentials: Bool { load(account: passwordAccount) != nil }
 
+    /// 保存済みの認証情報を削除(ログアウト)
+    static func clearCredentials() {
+        delete(account: emailAccount)
+        delete(account: passwordAccount)
+    }
+
     // 会員キー(= email)。端末登録に使用。
     static func loadMemberKey() -> String? { load(account: emailAccount) }
     static func saveMemberKey(_ value: String) { save(account: emailAccount, value: value) }
@@ -42,6 +48,15 @@ enum KeychainStore {
         attributes[kSecValueData as String] = data
         attributes[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         SecItemAdd(attributes as CFDictionary, nil)
+    }
+
+    private static func delete(account: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 
     private static func load(account: String) -> String? {
