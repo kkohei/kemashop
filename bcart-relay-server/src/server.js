@@ -34,6 +34,15 @@ app.post('/devices/register', (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- 退会(アカウント削除)申請 ----
+// アプリの「退会申請」ボタンから呼ばれる。管理者が管理画面で実際に削除する運用。
+app.post('/account/deletion-request', (req, res) => {
+  const { memberId, deviceToken } = req.body || {};
+  store.addDeletionRequest({ memberId, deviceToken });
+  console.log('[deletion] 退会申請 member=', memberId || '(不明)');
+  res.json({ ok: true });
+});
+
 // ---- 手動テスト送信 ----
 app.post('/push/test', async (req, res) => {
   const { memberId, title = 'テスト通知', body = 'これはテストです' } = req.body || {};

@@ -26,7 +26,23 @@ db.exec(`
     event_key   TEXT PRIMARY KEY,
     created_at  TEXT NOT NULL
   );
+
+  -- 退会(アカウント削除)申請。管理者が管理画面で削除処理する。
+  CREATE TABLE IF NOT EXISTS deletion_requests (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id     TEXT,
+    device_token  TEXT,
+    created_at    TEXT NOT NULL,
+    handled       INTEGER NOT NULL DEFAULT 0
+  );
 `);
+
+const stmtAddDeletion = db.prepare(
+  `INSERT INTO deletion_requests (member_id, device_token, created_at) VALUES (?, ?, ?)`
+);
+const stmtListDeletion = db.prepare(
+  `SELECT id, member_id, device_token, created_at, handled FROM deletion_requests ORDER BY created_at DESC`
+);
 
 const stmtUpsertDevice = db.prepare(`
   INSERT INTO devices (member_id, device_token, platform, updated_at)
@@ -71,6 +87,15 @@ export const store = {
     if (stmtSeenEvent.get(eventKey)) return true;
     stmtMarkEvent.run(eventKey, new Date().toISOString());
     return false;
+  },
+
+  // 退会申請を記録
+  addDeletionRequest({ memberId, deviceToken }) {
+    stmtAddDeletion.run(String(memberId || ''), String(deviceToken || ''), new Date().toISOString());
+  },
+
+  listDeletionRequests() {
+    return stmtListDeletion.all();
   },
 };
 

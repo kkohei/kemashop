@@ -17,6 +17,9 @@ struct RootView: View {
                     BcartWebView()
                     BottomBar()
                 }
+                .sheet(isPresented: $appState.showSettings) {
+                    SettingsView().environmentObject(appState)
+                }
             }
         }
         .onChange(of: scenePhase) { newPhase in
@@ -136,17 +139,96 @@ struct FlowingGoldBackground: View {
 
 /// WebView下部の常設ナビゲーションバー。
 struct BottomBar: View {
+    @EnvironmentObject var appState: AppState
+
     var body: some View {
         HStack(alignment: .center) {
             BarButton(title: "ホーム", systemImage: "house", path: "/")
             BarButton(title: "ログイン", systemImage: "person.crop.circle", path: AppConfig.loginPath)
             BarButton(title: "新規登録", systemImage: "person.badge.plus", path: AppConfig.registerPath)
             BarButton(title: "注文履歴", systemImage: "clock.arrow.circlepath", path: AppConfig.orderHistoryPath)
+            Button {
+                appState.showSettings = true
+            } label: {
+                VStack(spacing: 3) {
+                    Image(systemName: "gearshape").font(.system(size: 20))
+                    Text("設定").font(.caption2)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .foregroundStyle(.primary)
         }
         .padding(.top, 8)
         .padding(.bottom, 4)
         .background(.regularMaterial)
         .overlay(Divider(), alignment: .top)
+    }
+}
+
+/// 設定シート。App Store要件のため、アプリ内から退会(アカウント削除)を申請できる。
+struct SettingsView: View {
+    @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var showConfirm = false
+    @State private var done = false
+
+    var body: some View {
+        NavigationView {
+            List {
+                Section(header: Text("アカウント")) {
+                    Button(role: .destructive) {
+                        showConfirm = true
+                    } label: {
+                        Label("退会（アカウント削除）を申請", systemImage: "trash")
+                    }
+                }
+                Section(footer: Text("退会を申請すると、数営業日以内にアカウントと関連データを削除いたします。")) {
+                    EmptyView()
+                }
+            }
+            .navigationTitle("設定")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") { dismiss() }
+                }
+            }
+            .alert("退会（アカウント削除）を申請します", isPresented: $showConfirm) {
+                Button("キャンセル", role: .cancel) {}
+                Button("申請する", role: .destructive) { submit() }
+            } message: {
+                Text("この操作でアカウント削除を申請します。数営業日以内に削除いたします。よろしいですか？")
+            }
+            .alert("申請を受け付けました", isPresented: $done) {
+                Button("OK") { dismiss() }
+            } message: {
+                Text("退会申請を受け付けました。削除完了までお待ちください。")
+            }
+        }
+    }
+
+    private func submit() {
+        DeletionRequest.submit(
+            memberKey: KeychainStore.loadMemberKey(),
+            deviceToken: PushTokenStore.shared.deviceToken
+        )
+        done = true
+    }
+}
+
+/// 退会申請を中継サーバーへ送信する。
+enum DeletionRequest {
+    static func submit(memberKey: String?, deviceToken: String?) {
+        let url = AppConfig.relayBaseURL.appendingPathComponent("/account/deletion-request")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "memberId": memberKey ?? "",
+            "deviceToken": deviceToken ?? "",
+        ]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        URLSession.shared.dataTask(with: req).resume()
     }
 }
 

@@ -27,6 +27,8 @@ final class AppState: ObservableObject {
     @Published var route: AppRoute
     /// WebViewが最初に開くパス(Welcome画面のボタンで設定)
     @Published var startPath: String
+    /// 設定シート(退会申請など)の表示
+    @Published var showSettings = false
     /// ログイン中の会員を識別するキー(email)
     @Published var memberKey: String? {
         didSet { if let memberKey { KeychainStore.saveMemberKey(memberKey) } }
