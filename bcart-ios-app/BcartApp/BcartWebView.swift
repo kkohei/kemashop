@@ -20,6 +20,10 @@ struct BcartWebView: UIViewRepresentable {
         controller.addUserScript(
             WKUserScript(source: Coordinator.mobileFormJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         )
+        // App Store審査対策: 他プラットフォーム(Android等)への言及ブロックを隠す
+        controller.addUserScript(
+            WKUserScript(source: Coordinator.hidePlatformJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        )
 
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default() // 永続Cookie
@@ -226,6 +230,30 @@ struct BcartWebView: UIViewRepresentable {
             card.appendChild(h); card.appendChild(bodyEl); card.appendChild(btn);
             overlay.appendChild(card);
             document.body.appendChild(overlay);
+          }
+          if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', run); } else { run(); }
+        })();
+        """
+
+        /// App Store審査対策: 「推奨環境」など Android 等の他プラットフォーム表記を含むブロックを隠す。
+        /// 入力欄を含む要素は隠さない安全設計。
+        static let hidePlatformJS = """
+        (function(){
+          function hasField(el){ return el && el.querySelector && !!el.querySelector('input:not([type=hidden]),select,textarea'); }
+          function run(){
+            var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+            var n, targets = [];
+            while (n = w.nextNode()) {
+              var v = n.nodeValue || '';
+              if (v.indexOf('Android') >= 0 || v.indexOf('推奨環境') >= 0) {
+                var el = n.parentElement;
+                while (el && el.parentElement && el.parentElement !== document.body && !hasField(el.parentElement)) {
+                  el = el.parentElement;
+                }
+                if (el && !hasField(el)) targets.push(el);
+              }
+            }
+            targets.forEach(function(el){ el.style.display = 'none'; });
           }
           if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', run); } else { run(); }
         })();
