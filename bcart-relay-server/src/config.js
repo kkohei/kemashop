@@ -23,6 +23,9 @@ export const config = {
     capture: String(process.env.WEBHOOK_CAPTURE).toLowerCase() === 'true',
   },
 
+  // 管理画面(/admin)と一斉配信APIのパスワード
+  adminSecret: process.env.ADMIN_SECRET || '',
+
   apns: {
     keyPath: required('APNS_KEY_PATH'),
     keyId: required('APNS_KEY_ID'),

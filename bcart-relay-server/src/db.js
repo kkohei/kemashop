@@ -35,7 +35,28 @@ db.exec(`
     created_at    TEXT NOT NULL,
     handled       INTEGER NOT NULL DEFAULT 0
   );
+
+  -- 一斉配信の履歴
+  CREATE TABLE IF NOT EXISTS broadcasts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT NOT NULL,
+    body        TEXT NOT NULL,
+    sent_count  INTEGER NOT NULL,
+    created_at  TEXT NOT NULL
+  );
 `);
+
+const stmtAllTokens = db.prepare(`SELECT DISTINCT device_token FROM devices`);
+const stmtDeviceCount = db.prepare(`SELECT COUNT(DISTINCT device_token) AS n FROM devices`);
+const stmtAddBroadcast = db.prepare(
+  `INSERT INTO broadcasts (title, body, sent_count, created_at) VALUES (?, ?, ?, ?)`
+);
+const stmtListBroadcasts = db.prepare(
+  `SELECT title, body, sent_count, created_at FROM broadcasts ORDER BY id DESC LIMIT 20`
+);
+const stmtPendingDeletions = db.prepare(
+  `SELECT COUNT(*) AS n FROM deletion_requests WHERE handled = 0`
+);
 
 const stmtAddDeletion = db.prepare(
   `INSERT INTO deletion_requests (member_id, device_token, created_at) VALUES (?, ?, ?)`
@@ -96,6 +117,27 @@ export const store = {
 
   listDeletionRequests() {
     return stmtListDeletion.all();
+  },
+
+  // ---- 一斉配信用 ----
+  allTokens() {
+    return stmtAllTokens.all().map((r) => r.device_token);
+  },
+
+  deviceCount() {
+    return stmtDeviceCount.get().n;
+  },
+
+  addBroadcast({ title, body, sentCount }) {
+    stmtAddBroadcast.run(title, body, sentCount, new Date().toISOString());
+  },
+
+  listBroadcasts() {
+    return stmtListBroadcasts.all();
+  },
+
+  pendingDeletionCount() {
+    return stmtPendingDeletions.get().n;
   },
 };
 

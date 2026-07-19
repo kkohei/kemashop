@@ -34,6 +34,54 @@ app.post('/devices/register', (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- 管理画面(一斉配信) ----
+const adminHtml = fs.readFileSync(new URL('./admin.html', import.meta.url), 'utf8');
+
+function safeEqual(a, b) {
+  const ba = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  return ba.length === bb.length && crypto.timingSafeEqual(ba, bb);
+}
+
+function requireAdmin(req, res, next) {
+  if (!config.adminSecret) {
+    return res.status(503).json({ ok: false, error: 'ADMIN_SECRET が未設定です(.env を確認)' });
+  }
+  if (!safeEqual(req.get('X-Admin-Token') || '', config.adminSecret)) {
+    return res.status(401).json({ ok: false, error: 'unauthorized' });
+  }
+  next();
+}
+
+app.get('/admin', (_req, res) => res.type('html').send(adminHtml));
+
+app.get('/admin/stats', requireAdmin, (_req, res) => {
+  res.json({
+    ok: true,
+    devices: store.deviceCount(),
+    pendingDeletions: store.pendingDeletionCount(),
+    broadcasts: store.listBroadcasts(),
+  });
+});
+
+// 全端末への一斉配信
+app.post('/admin/broadcast', requireAdmin, async (req, res) => {
+  const { title, body } = req.body || {};
+  if (!title || !body) {
+    return res.status(400).json({ ok: false, error: 'title と body は必須です' });
+  }
+  const tokens = store.allTokens();
+  if (tokens.length === 0) {
+    return res.json({ ok: true, sent: 0, failed: 0, removed: 0 });
+  }
+  const { results, invalid } = await sendPushToTokens(tokens, { title, body, data: { url: '/' } });
+  invalid.forEach((t) => store.removeToken(t));
+  const sent = results.filter((r) => r.ok).length;
+  store.addBroadcast({ title, body, sentCount: sent });
+  console.log(`[broadcast] "${title}" 送信=${sent} 失敗=${results.length - sent} 無効削除=${invalid.length}`);
+  res.json({ ok: true, sent, failed: results.length - sent, removed: invalid.length });
+});
+
 // ---- 退会(アカウント削除)申請 ----
 // アプリの「退会申請」ボタンから呼ばれる。管理者が管理画面で実際に削除する運用。
 app.post('/account/deletion-request', (req, res) => {
