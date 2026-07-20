@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KEMA PRO SHOP 公式アプリ登場 | サロン様向け発注アプリ</title>
+<style>
+  :root {
+    --gold-deep: #6b4f14;
+    --gold: #a9781a;
+    --gold-bright: #d7a934;
+    --gold-pale: #f7e9b6;
+    --ink: #2a2318;
+    --paper: #fffdf8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif;
+    color: var(--ink); background: var(--paper); line-height: 1.9;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+
+  /* ヒーロー */
+  .hero {
+    background:
+      radial-gradient(circle at 30% 20%, rgba(255,255,255,.35), rgba(255,255,255,0) 55%),
+      linear-gradient(135deg, var(--gold-deep) 0%, var(--gold) 35%, var(--gold-bright) 70%, var(--gold-pale) 100%);
+    color: #fff; text-align: center; padding: 72px 20px 64px;
+  }
+  .hero .brand { font-size: 44px; font-weight: 800; letter-spacing: .35em; text-indent: .35em; }
+  .hero .sub { font-size: 15px; letter-spacing: .5em; text-indent: .5em; opacity: .95; margin-top: 4px; }
+  .hero h1 {
+    font-size: 24px; font-weight: 700; margin-top: 34px; letter-spacing: .06em;
+    text-shadow: 0 1px 8px rgba(80,55,10,.35);
+  }
+  .hero p.lead { font-size: 15px; margin-top: 12px; opacity: .95; }
+  .badge {
+    display: inline-block; margin-top: 28px; background: #111; color: #fff;
+    padding: 14px 34px; border-radius: 999px; font-weight: 700; font-size: 16px;
+    text-decoration: none; letter-spacing: .05em;
+    box-shadow: 0 6px 18px rgba(40,25,0,.35);
+  }
+  .badge small { display: block; font-weight: 400; font-size: 11px; opacity: .8; letter-spacing: .1em; }
+
+  /* 本文 */
+  section { padding: 52px 0 8px; }
+  h2 {
+    font-size: 21px; letter-spacing: .08em; margin-bottom: 26px;
+    padding-bottom: 10px; border-bottom: 2px solid var(--gold-bright);
+    display: inline-block;
+  }
+  .intro p { margin-bottom: 1.2em; }
+
+  /* 機能カード */
+  .features { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 560px) { .features { grid-template-columns: 1fr; } }
+  .feature {
+    background: #fff; border: 1px solid #eadfbe; border-radius: 14px; padding: 22px;
+    box-shadow: 0 2px 10px rgba(120,90,20,.06);
+  }
+  .feature .icon { font-size: 28px; }
+  .feature h3 { font-size: 16px; margin: 8px 0 6px; color: var(--gold-deep); }
+  .feature p { font-size: 13.5px; color: #5a5142; line-height: 1.8; }
+
+  /* ステップ */
+  .steps { counter-reset: step; }
+  .step {
+    display: flex; gap: 16px; align-items: flex-start; margin-bottom: 22px;
+    background: #fff; border: 1px solid #eadfbe; border-radius: 14px; padding: 18px 20px;
+  }
+  .step .num {
+    counter-increment: step; flex: 0 0 auto;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+    color: #fff; font-weight: 800; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step .num::before { content: counter(step); }
+  .step h3 { font-size: 15.5px; margin-bottom: 4px; }
+  .step p { font-size: 13.5px; color: #5a5142; }
+
+  /* 注意書き */
+  .note {
+    background: #faf4e0; border-left: 4px solid var(--gold-bright);
+    border-radius: 0 10px 10px 0; padding: 16px 18px; font-size: 13.5px; color: #5a5142;
+    margin-top: 8px;
+  }
+  .note strong { color: var(--gold-deep); }
+
+  /* CTA */
+  .cta {
+    text-align: center; margin: 56px 0;
+    background: linear-gradient(135deg, var(--gold-deep), var(--gold) 60%, var(--gold-bright));
+    border-radius: 20px; padding: 44px 24px; color: #fff;
+  }
+  .cta h2 { border: none; color: #fff; margin-bottom: 6px; padding-bottom: 0; }
+  .cta p { font-size: 14px; opacity: .95; }
+  .qr-box {
+    width: 132px; height: 132px; margin: 22px auto 0; background: #fff; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    color: #999; font-size: 11px; text-align: center; line-height: 1.5;
+  }
+
+  footer {
+    text-align: center; padding: 36px 20px 48px; font-size: 12.5px; color: #8a7c60;
+    border-top: 1px solid #eee3c4; margin-top: 30px;
+  }
+  footer a { color: var(--gold); }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="brand">KEMA</div>
+  <div class="sub">PRO SHOP</div>
+  <h1>サロン様向け公式アプリが登場しました</h1>
+  <p class="lead">いつもの発注を、もっと速く、もっと便利に。</p>
+  <!-- TODO: href をApp Storeの公開URLに差し替えてください -->
+  <a class="badge" href="https://apps.apple.com/jp/" target="_blank" rel="noopener">
+    App Store でダウンロード
+    <small>iPhone 対応・無料</small>
+  </a>
+</div>
+
+<div class="wrap">
+
+  <section class="intro">
+    <h2>アプリ登場のお知らせ</h2>
+    <p>いつもKEMA製品をご愛顧いただき、誠にありがとうございます。</p>
+    <p>このたび、お取引サロン様向けの公式発注アプリ<strong>「KEMA PRO SHOP」</strong>をApp Storeにて公開いたしました。日々の仕入れ・発注業務を、スマートフォンからより快適に行っていただけます。</p>
+  </section>
+
+  <section>
+    <h2>アプリでできること</h2>
+    <div class="features">
+      <div class="feature">
+        <div class="icon">🛒</div>
+        <h3>かんたん発注</h3>
+        <p>いつものアイテムをスマホから数タップで注文。外出先や施術の合間にも、思い立ったときにすぐ発注できます。</p>
+      </div>
+      <div class="feature">
+        <div class="icon">📦</div>
+        <h3>出荷のお知らせが届く</h3>
+        <p>ご注文の商品を発送すると、プッシュ通知でお知らせ。「いつ届くかな?」の確認の手間がなくなります。</p>
+      </div>
+      <div class="feature">
+        <div class="icon">🔐</div>
+        <h3>Face ID でラクラクログイン</h3>
+        <p>2回目からは顔認証だけでログイン完了。ID・パスワードを毎回入力する必要はありません。</p>
+      </div>
+      <div class="feature">
+        <div class="icon">🕐</div>
+        <h3>注文履歴もすぐ確認</h3>
+        <p>過去のご注文をいつでも確認。「前回と同じものを」という発注もスムーズです。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>ご利用開始は3ステップ</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="num"></div>
+        <div>
+          <h3>アプリをダウンロード</h3>
+          <p>App Storeで「<strong>KEMA PRO SHOP</strong>」と検索、またはこのページのボタンからダウンロード(無料)。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num"></div>
+        <div>
+          <h3>ログイン または 新規登録</h3>
+          <p>すでにお取引のあるサロン様は、いつものメールアドレスとパスワードでログイン。初めての方は「新規登録」からお申し込みください(店舗確認の審査がございます)。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num"></div>
+        <div>
+          <h3>通知を「許可」に</h3>
+          <p>出荷のお知らせやお得な情報をお届けするため、通知の許可をおすすめします。</p>
+        </div>
+      </div>
+    </div>
+    <p class="note"><strong>ご利用条件:</strong>本アプリは美容室・ヘアサロン等の事業者様向けサービスです。ご利用にはKEMAの会員登録(店舗審査)が必要です。対応機種:iPhone(iOS 18以降推奨)。</p>
+  </section>
+
+  <div class="cta">
+    <h2>今すぐアプリをダウンロード</h2>
+    <p>App Storeで「KEMA PRO SHOP」と検索</p>
+    <!-- QRコード画像ができたら下のボックスを <img> に差し替えてください -->
+    <div class="qr-box">QRコード<br>挿入予定</div>
+    <!-- TODO: href をApp Storeの公開URLに差し替えてください -->
+    <a class="badge" style="margin-top:26px" href="https://apps.apple.com/jp/" target="_blank" rel="noopener">
+      App Store でダウンロード
+      <small>iPhone 対応・無料</small>
+    </a>
+  </div>
+
+  <footer>
+    ご不明な点はお気軽にお問い合わせください<br>
+    KEMA OFFICIAL PRO SHOP ／ <a href="mailto:info@kema.hair">info@kema.hair</a>
+  </footer>
+
+</div>
+
+</body>
+</html>
