@@ -57,6 +57,9 @@ const stmtListBroadcasts = db.prepare(
 const stmtPendingDeletions = db.prepare(
   `SELECT COUNT(*) AS n FROM deletion_requests WHERE handled = 0`
 );
+const stmtMarkDeletionHandled = db.prepare(
+  `UPDATE deletion_requests SET handled = 1 WHERE id = ?`
+);
 
 const stmtAddDeletion = db.prepare(
   `INSERT INTO deletion_requests (member_id, device_token, created_at) VALUES (?, ?, ?)`
@@ -138,6 +141,10 @@ export const store = {
 
   pendingDeletionCount() {
     return stmtPendingDeletions.get().n;
+  },
+
+  markDeletionHandled(id) {
+    stmtMarkDeletionHandled.run(id);
   },
 };
 

@@ -74,6 +74,12 @@
   </div>
 
   <div class="card">
+    <h1>退会申請</h1>
+    <p class="sub">未対応の申請は、Bカート管理画面で会員を削除してから「対応済みにする」を押してください</p>
+    <div class="hist" id="deletions"><p class="sub">読み込み中...</p></div>
+  </div>
+
+  <div class="card">
     <h1>送信履歴</h1>
     <div class="hist" id="hist"><p class="sub">読み込み中...</p></div>
   </div>
@@ -105,14 +111,39 @@ function refresh() {
   return api('/admin/stats').then(function (s) {
     document.getElementById('devCount').textContent = s.devices;
     document.getElementById('delCount').textContent = s.pendingDeletions;
+
     var h = document.getElementById('hist');
-    if (!s.broadcasts.length) { h.innerHTML = '<p class="sub">まだ送信履歴はありません</p>'; return; }
-    h.innerHTML = s.broadcasts.map(function (b) {
-      return '<div class="hist-item"><div class="t">' + esc(b.title) + '</div>' +
-             '<div class="m">' + esc(b.body) + '</div>' +
-             '<div class="d">' + fmtDate(b.created_at) + ' / ' + b.sent_count + '台に送信</div></div>';
-    }).join('');
+    if (!s.broadcasts.length) { h.innerHTML = '<p class="sub">まだ送信履歴はありません</p>'; }
+    else {
+      h.innerHTML = s.broadcasts.map(function (b) {
+        return '<div class="hist-item"><div class="t">' + esc(b.title) + '</div>' +
+               '<div class="m">' + esc(b.body) + '</div>' +
+               '<div class="d">' + fmtDate(b.created_at) + ' / ' + b.sent_count + '台に送信</div></div>';
+      }).join('');
+    }
+
+    var dl = document.getElementById('deletions');
+    if (!s.deletionRequests || !s.deletionRequests.length) {
+      dl.innerHTML = '<p class="sub">退会申請はありません</p>';
+    } else {
+      dl.innerHTML = s.deletionRequests.map(function (r) {
+        var status = r.handled
+          ? '<span style="color:#1a7a2e">対応済み</span>'
+          : '<button style="margin:6px 0 0;padding:8px 14px;width:auto;font-size:13px" onclick="markHandled(' + r.id + ')">対応済みにする</button>';
+        return '<div class="hist-item">' +
+               '<div class="t">' + esc(r.member_id || '(会員不明)') + '</div>' +
+               '<div class="d">申請日時: ' + fmtDate(r.created_at) + '</div>' +
+               status + '</div>';
+      }).join('');
+    }
   });
+}
+
+function markHandled(id) {
+  if (!confirm('この退会申請を「対応済み」にします。\nBカート管理画面での会員削除はお済みですか?')) return;
+  api('/admin/deletion-handled', { method: 'POST', body: JSON.stringify({ id: id }) })
+    .then(refresh)
+    .catch(function () { alert('更新に失敗しました'); });
 }
 
 function esc(s) {

@@ -61,7 +61,16 @@ app.get('/admin/stats', requireAdmin, (_req, res) => {
     devices: store.deviceCount(),
     pendingDeletions: store.pendingDeletionCount(),
     broadcasts: store.listBroadcasts(),
+    deletionRequests: store.listDeletionRequests(),
   });
+});
+
+// 退会申請を「対応済み」にする(Bカート管理画面で会員削除を終えた後に押す)
+app.post('/admin/deletion-handled', requireAdmin, (req, res) => {
+  const { id } = req.body || {};
+  if (!id) return res.status(400).json({ ok: false, error: 'id は必須です' });
+  store.markDeletionHandled(id);
+  res.json({ ok: true });
 });
 
 // 全端末への一斉配信
