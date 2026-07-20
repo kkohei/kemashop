@@ -9,6 +9,7 @@
 | 同・新規会員登録 | https://kema.i17.bcart.jp/regist.php |
 | 同・マイページ(注文履歴) | https://kema.i17.bcart.jp/mypage.php |
 | 同・プライバシーポリシー | https://kema.i17.bcart.jp/privacy.php |
+| **App Store(KEMA PRO SHOP)** | **https://apps.apple.com/jp/app/kema-pro-shop/id6791068342** |
 | 中継サーバー(XServer VPS) | https://relay.kema.hair |
 | 通知管理画面(一斉配信・退会申請) | https://relay.kema.hair/admin |
 | サポートメール | info@kema.hair |
