@@ -2,6 +2,7 @@ import express from 'express';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { store } from './db.js';
 import { sendPushToTokens } from './apns.js';
@@ -22,6 +23,10 @@ app.use(
 
 // ---- ヘルスチェック ----
 app.get('/healthz', (_req, res) => res.json({ ok: true }));
+
+// ---- 静的ファイル配信(告知記事の画像など) ----
+const publicDir = fileURLToPath(new URL('../public', import.meta.url));
+app.use('/assets', express.static(publicDir, { maxAge: '7d' }));
 
 // ---- デバイス登録 ----
 // iOSアプリがログイン成功時に呼ぶ: { memberId, deviceToken, platform }
