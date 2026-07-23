@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { store } from './db.js';
-import { sendPushToTokens } from './apns.js';
+import { sendToDevices } from './push.js';
 // bcart.js(受注API取得)は再入荷ポーリング等の将来拡張用。
 // 受注イベントの会員ID・出荷状況は Webhook ボディに含まれるため、ここでは未使用。
 
@@ -84,11 +84,11 @@ app.post('/admin/broadcast', requireAdmin, async (req, res) => {
   if (!title || !body) {
     return res.status(400).json({ ok: false, error: 'title と body は必須です' });
   }
-  const tokens = store.allTokens();
-  if (tokens.length === 0) {
+  const devices = store.allDevices();
+  if (devices.length === 0) {
     return res.json({ ok: true, sent: 0, failed: 0, removed: 0 });
   }
-  const { results, invalid } = await sendPushToTokens(tokens, { title, body, data: { url: '/' } });
+  const { results, invalid } = await sendToDevices(devices, { title, body, data: { url: '/' } });
   invalid.forEach((t) => store.removeToken(t));
   const sent = results.filter((r) => r.ok).length;
   store.addBroadcast({ title, body, sentCount: sent });
@@ -108,13 +108,13 @@ app.post('/account/deletion-request', (req, res) => {
 // ---- 手動テスト送信 ----
 app.post('/push/test', async (req, res) => {
   const { memberId, title = 'テスト通知', body = 'これはテストです' } = req.body || {};
-  const tokens = store.tokensForMember(memberId);
-  if (tokens.length === 0) {
+  const devices = store.devicesForMember(memberId);
+  if (devices.length === 0) {
     return res.status(404).json({ ok: false, error: 'この会員の端末が登録されていません' });
   }
-  const { results, invalid } = await sendPushToTokens(tokens, { title, body });
+  const { results, invalid } = await sendToDevices(devices, { title, body });
   invalid.forEach((t) => store.removeToken(t));
-  res.json({ ok: true, sent: tokens.length, results, removed: invalid.length });
+  res.json({ ok: true, sent: devices.length, results, removed: invalid.length });
 });
 
 // ---- Webhook 署名検証 ----
@@ -241,13 +241,15 @@ async function handleEvent(eventType, event) {
   console.log('[webhook] 通知対象外のイベント:', eventType);
 }
 
-// 複数キー(customer_id / email)に紐づく端末トークンを重複なく集める
-function tokensForKeys(keys) {
-  const set = new Set();
+// 複数キー(customer_id / email)に紐づく端末を重複なく集める(platform込み)
+function devicesForKeys(keys) {
+  const seen = new Map();
   for (const k of keys) {
-    for (const t of store.tokensForMember(String(k))) set.add(t);
+    for (const d of store.devicesForMember(String(k))) {
+      seen.set(d.device_token, d);
+    }
   }
-  return [...set];
+  return [...seen.values()];
 }
 
 async function pushToKeys(keys, message, eventType) {
@@ -255,14 +257,14 @@ async function pushToKeys(keys, message, eventType) {
     console.log('[webhook] 送信なし type=', eventType, 'keys=', keys);
     return;
   }
-  const tokens = tokensForKeys(keys);
-  if (tokens.length === 0) {
+  const devices = devicesForKeys(keys);
+  if (devices.length === 0) {
     console.log('[webhook] 端末未登録 keys=', keys);
     return;
   }
-  const { invalid } = await sendPushToTokens(tokens, message);
+  const { invalid } = await sendToDevices(devices, message);
   invalid.forEach((t) => store.removeToken(t));
-  console.log(`[webhook] 送信 type=${eventType} keys=${keys.join(',')} 端末=${tokens.length}`);
+  console.log(`[webhook] 送信 type=${eventType} keys=${keys.join(',')} 端末=${devices.length}`);
 }
 
 app.listen(config.port, () => {

@@ -47,6 +47,12 @@ db.exec(`
 `);
 
 const stmtAllTokens = db.prepare(`SELECT DISTINCT device_token FROM devices`);
+const stmtDevicesByMember = db.prepare(
+  `SELECT device_token, platform FROM devices WHERE member_id = ?`
+);
+const stmtAllDevices = db.prepare(
+  `SELECT device_token, MAX(platform) AS platform FROM devices GROUP BY device_token`
+);
 const stmtDeviceCount = db.prepare(`SELECT COUNT(DISTINCT device_token) AS n FROM devices`);
 const stmtAddBroadcast = db.prepare(
   `INSERT INTO broadcasts (title, body, sent_count, created_at) VALUES (?, ?, ?, ?)`
@@ -122,9 +128,18 @@ export const store = {
     return stmtListDeletion.all();
   },
 
+  // プラットフォーム(ios/android)込みで会員の端末を取得
+  devicesForMember(memberId) {
+    return stmtDevicesByMember.all(String(memberId));
+  },
+
   // ---- 一斉配信用 ----
   allTokens() {
     return stmtAllTokens.all().map((r) => r.device_token);
+  },
+
+  allDevices() {
+    return stmtAllDevices.all();
   },
 
   deviceCount() {

@@ -34,6 +34,11 @@ export const config = {
     production: String(process.env.APNS_PRODUCTION).toLowerCase() === 'true',
   },
 
+  // FCM(Androidプッシュ)。Firebaseのサービスアカウント鍵JSONのパス
+  fcm: {
+    serviceAccountPath: process.env.FCM_SERVICE_ACCOUNT_PATH || '',
+  },
+
   bcart: {
     token: process.env.BCART_API_TOKEN || '',
     apiBase: process.env.BCART_API_BASE || 'https://api.bcart.jp',
