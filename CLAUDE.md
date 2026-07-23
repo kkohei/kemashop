@@ -22,6 +22,8 @@
   BカートWebhook受信 → 署名検証 → APNsプッシュ送信。管理画面 `/admin` で一斉配信・退会申請管理。
 - `bcart-ios-app/` … iOSアプリ「KEMA PRO SHOP」(SwiftUI)。Bundle ID: `kema.Bcartapp`。
   WKWebViewでBカートを表示 + Face ID自動ログイン + プッシュ受信。App Store公開済み(v1.0)。
+- `bcart-android-app/` … Androidアプリ(Kotlin/Jetpack Compose)。パッケージ: `hair.kema.proshop`。
+  プッシュはFCM(Firebase設定が必要。google-services.json は app/ に配置、リポジトリには含めない)。
 - `docs/bcart-ios-app/` … 設計書・申請ガイド・告知記事HTML。
 
 ## 運用メモ
