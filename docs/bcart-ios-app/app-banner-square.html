@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>KEMA PRO SHOP 公式アプリ登場バナー</title>
+<meta name="hz:slide-selector" content=".banner" />
+<meta name="hz:canvas-width" content="1080" />
+<meta name="hz:canvas-height" content="1080" />
+<link rel="stylesheet" href="https://use.typekit.net/eym8xzs.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #f0f0f0; }
+
+  .banner {
+    position: relative;
+    width: 1080px;
+    height: 1080px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #6b4f14 0%, #a9781a 35%, #d7a934 72%, #f7e9b6 100%);
+  }
+  .glow {
+    position: absolute; left: -180px; top: -180px; width: 760px; height: 760px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.32), rgba(255,255,255,0) 65%);
+  }
+
+  /* ブランド(左上) */
+  .mark {
+    position: absolute; left: 64px; top: 58px; width: 74px; height: 74px;
+    border: 4px solid #ffffff; border-radius: 16px;
+    text-align: center; line-height: 66px;
+    font-family: "kinuta-mincho-stdn", "Noto Serif JP", serif;
+    font-weight: 400; font-size: 40px; color: #ffffff;
+  }
+  .brandname {
+    position: absolute; left: 158px; top: 64px;
+    font-family: "kinuta-mincho-stdn", "Noto Serif JP", serif;
+    font-weight: 400; font-size: 40px; letter-spacing: 10px; color: #ffffff;
+  }
+  .brandsub {
+    position: absolute; left: 161px; top: 112px;
+    font-family: "sawarabi-gothic", "Noto Sans JP", sans-serif;
+    font-weight: 400; font-size: 15px; letter-spacing: 7px; color: #ffffff; opacity: 0.95;
+  }
+
+  /* ラベル */
+  .label {
+    position: absolute; left: 64px; top: 208px;
+    display: inline-block; padding: 10px 26px;
+    border: 2px solid rgba(255,255,255,0.9); border-radius: 999px;
+    font-family: "sawarabi-gothic", "Noto Sans JP", sans-serif;
+    font-weight: 400; font-size: 24px; letter-spacing: 4px; color: #ffffff;
+  }
+
+  /* 見出し */
+  .headline {
+    position: absolute; left: 60px; top: 292px; width: 620px;
+    font-family: "kinuta-mincho-stdn", "Noto Serif JP", serif;
+    font-weight: 400; font-size: 104px; line-height: 1.28;
+    color: #ffffff; letter-spacing: 6px;
+    text-shadow: 0 2px 14px rgba(80, 55, 10, 0.35);
+  }
+  .sub {
+    position: absolute; left: 66px; top: 596px; width: 560px;
+    font-family: "sawarabi-gothic", "Noto Sans JP", sans-serif;
+    font-weight: 400; font-size: 27px; line-height: 1.7; letter-spacing: 2px;
+    color: #ffffff;
+  }
+
+  /* 機能タグ */
+  .tags { position: absolute; left: 64px; top: 692px; width: 560px; }
+  .tag {
+    display: inline-block; margin: 0 10px 12px 0; padding: 9px 20px;
+    background: rgba(255,255,255,0.16);
+    border: 1px solid rgba(255,255,255,0.75); border-radius: 999px;
+    font-family: "sawarabi-gothic", "Noto Sans JP", sans-serif;
+    font-weight: 400; font-size: 21px; letter-spacing: 2px; color: #ffffff;
+  }
+
+  /* QR + CTA */
+  .qrcard {
+    position: absolute; left: 64px; top: 836px; width: 180px; height: 180px;
+    background: #ffffff; border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(60, 40, 0, 0.30);
+  }
+  .qrimg { position: absolute; left: 74px; top: 846px; width: 160px; height: 160px; }
+  .cta {
+    position: absolute; left: 272px; top: 872px;
+    display: inline-block; background: #131313; color: #ffffff;
+    padding: 20px 40px; border-radius: 999px;
+    font-family: "m-plus-1p", "Noto Sans JP", sans-serif;
+    font-weight: 700; font-size: 29px; letter-spacing: 1px;
+    box-shadow: 0 8px 24px rgba(40, 25, 0, 0.35);
+  }
+  .ctanote {
+    position: absolute; left: 276px; top: 954px;
+    font-family: "sawarabi-gothic", "Noto Sans JP", sans-serif;
+    font-weight: 400; font-size: 20px; line-height: 1.7; letter-spacing: 1px;
+    color: #ffffff;
+  }
+
+  /* スマホモック(右) — CSSで直接描画・バナー座標に直接配置 */
+  .phonebody {
+    position: absolute; left: 664px; top: 316px; width: 395px; height: 820px;
+    border-radius: 56px; background: #111111;
+    box-shadow: 0 30px 60px rgba(60, 40, 0, 0.35);
+  }
+  .phonescreen {
+    position: absolute; left: 676px; top: 328px; width: 371px; height: 796px;
+    border-radius: 44px; overflow: hidden;
+    background:
+      radial-gradient(circle at 30% 24%, rgba(255,255,255,0.4), rgba(255,255,255,0) 52%),
+      linear-gradient(135deg, #6b4f14 0%, #a9781a 30%, #d7a934 62%, #efd47e 88%, #f7e9b6 100%);
+  }
+  .phoneisland {
+    position: absolute; top: 14px; left: 140px; width: 91px; height: 26px;
+    border-radius: 14px; background: #000000;
+  }
+  .phonemark {
+    position: absolute; top: 228px; left: 140px; width: 91px; height: 91px;
+    border: 4px solid #ffffff; border-radius: 17px;
+    text-align: center; line-height: 83px;
+    font-family: "kinuta-mincho-stdn", "Noto Serif JP", serif;
+    font-weight: 400; font-size: 49px; color: #ffffff;
+  }
+  .phonename {
+    position: absolute; top: 340px; left: 0; width: 371px; text-align: center;
+    font-family: "kinuta-mincho-stdn", "Noto Serif JP", serif;
+    font-weight: 400; font-size: 40px; letter-spacing: 11px; text-indent: 11px;
+    color: #ffffff;
+  }
+  .phonesub {
+    position: absolute; top: 395px; left: 0; width: 371px; text-align: center;
+    font-family: "sawarabi-gothic", "Noto Sans JP", sans-serif;
+    font-weight: 400; font-size: 15px; letter-spacing: 9px; text-indent: 9px;
+    color: #ffffff;
+  }
+  .phonebtn1 {
+    position: absolute; left: 41px; top: 625px; width: 289px;
+    padding: 15px 0; border-radius: 999px; background: #ffffff;
+    text-align: center; color: #1a1a1a;
+    font-family: "m-plus-1p", "Noto Sans JP", sans-serif;
+    font-weight: 700; font-size: 17px;
+  }
+  .phonebtn2 {
+    position: absolute; left: 41px; top: 690px; width: 289px;
+    padding: 14px 0; border-radius: 999px;
+    border: 2px solid rgba(255,255,255,0.95); background: rgba(255,255,255,0.12);
+    text-align: center; color: #ffffff;
+    font-family: "m-plus-1p", "Noto Sans JP", sans-serif;
+    font-weight: 700; font-size: 17px;
+  }
+</style>
+</head>
+<body>
+<div class="banner" data-canvas-width="1080" data-canvas-height="1080">
+  <div class="glow"></div>
+
+  <div class="mark">K</div>
+  <div class="brandname">KEMA</div>
+  <div class="brandsub">PRO SHOP</div>
+
+  <div class="label">サロン様専用 発注アプリ</div>
+
+  <div class="headline">公式アプリ<br>登場。</div>
+
+  <div class="sub">いつもの発注を、もっと速く、<br>もっと便利に。</div>
+
+  <div class="tags">
+    <span class="tag">かんたん発注</span><span class="tag">出荷プッシュ通知</span><span class="tag">顔認証ログイン</span>
+  </div>
+
+  <div class="phonebody"></div>
+  <div class="phonescreen">
+    <div class="phoneisland"></div>
+    <div class="phonemark">K</div>
+    <div class="phonename">KEMA</div>
+    <div class="phonesub">PRO SHOP</div>
+    <div class="phonebtn1">ログイン</div>
+    <div class="phonebtn2">新規登録</div>
+  </div>
+
+  <div class="qrcard"></div>
+  <img class="qrimg" src="data:image/png;base64,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" alt="App Store QRコード" width="160" height="160">
+  <div class="cta">App Store でダウンロード</div>
+  <div class="ctanote">iPhone 対応・無料<br>「KEMA PRO SHOP」で検索</div>
+</div>
+</body>
+</html>
