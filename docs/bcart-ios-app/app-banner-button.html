@@ -55,13 +55,25 @@
   }
 
   /* 見出し */
-  .headline {
-    position: absolute; left: 0; top: 558px; width: 1080px; text-align: center;
+  .headline-en {
+    position: absolute; left: 0; top: 574px; width: 1080px; text-align: center;
     font-family: "kinuta-mincho-stdn", "Noto Serif JP", serif;
-    font-weight: 400; font-size: 124px; line-height: 1.2;
-    color: #ffffff; letter-spacing: 10px; text-indent: 10px;
-    text-shadow: 0 2px 14px rgba(80, 55, 10, 0.35);
+    font-weight: 400; font-size: 22px; letter-spacing: 12px; text-indent: 12px;
+    color: #ffffff; opacity: 0.9;
   }
+  .headline {
+    position: absolute; left: 0; top: 616px; width: 1080px; text-align: center;
+    font-family: "kinuta-mincho-stdn", "Noto Serif JP", serif;
+    font-weight: 400; font-size: 80px; line-height: 1.2;
+    color: #ffffff; letter-spacing: 30px; text-indent: 30px;
+    text-shadow: 0 2px 12px rgba(80, 55, 10, 0.30);
+  }
+  .hairline {
+    position: absolute; top: 587px; width: 90px; height: 1px;
+    background: rgba(255,255,255,0.65);
+  }
+  .hairline.l { left: 300px; }
+  .hairline.r { left: 690px; }
 
   /* CTAピル */
   .cta {
@@ -90,6 +102,9 @@
 
   <div class="label">サロン様専用 発注アプリ</div>
 
+  <div class="hairline l"></div>
+  <div class="hairline r"></div>
+  <div class="headline-en">OFFICIAL APP</div>
   <div class="headline">公式アプリ</div>
 
   <div class="cta">App Store でダウンロード</div>
