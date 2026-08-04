@@ -49,8 +49,12 @@
 <div class="card" id="login">
   <h1>KEMA 通知管理</h1>
   <p class="sub">管理パスワードを入力してください</p>
-  <input type="password" id="pw" placeholder="管理パスワード" autocomplete="current-password">
-  <button id="loginBtn">ログイン</button>
+  <form id="loginForm" method="post" action="/admin">
+    <input type="text" name="username" value="admin" autocomplete="username" readonly
+           style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" tabindex="-1" aria-hidden="true">
+    <input type="password" id="pw" name="password" placeholder="管理パスワード" autocomplete="current-password" required>
+    <button id="loginBtn" type="submit">ログイン</button>
+  </form>
   <div class="msg" id="loginMsg"></div>
 </div>
 
@@ -86,7 +90,8 @@
 </div>
 
 <script>
-var token = sessionStorage.getItem('kemaAdminToken') || '';
+// 旧バージョンは sessionStorage 保存だったため、あれば引き継ぐ
+var token = localStorage.getItem('kemaAdminToken') || sessionStorage.getItem('kemaAdminToken') || '';
 
 function api(path, opts) {
   opts = opts || {};
@@ -158,12 +163,19 @@ function showMain() {
   refresh();
 }
 
-document.getElementById('loginBtn').addEventListener('click', function () {
+document.getElementById('loginForm').addEventListener('submit', function (e) {
+  e.preventDefault();
   token = document.getElementById('pw').value.trim();
   var msg = document.getElementById('loginMsg');
   msg.textContent = '確認中...'; msg.className = 'msg';
   api('/admin/stats').then(function () {
-    sessionStorage.setItem('kemaAdminToken', token);
+    localStorage.setItem('kemaAdminToken', token);
+    // Chrome系にパスワード保存を明示的に提案させる
+    try {
+      if (window.PasswordCredential) {
+        navigator.credentials.store(new PasswordCredential({ id: 'admin', password: token }));
+      }
+    } catch (err) { /* 未対応ブラウザは無視 */ }
     showMain();
   }).catch(function () {
     msg.textContent = 'パスワードが違います'; msg.className = 'msg ng';
