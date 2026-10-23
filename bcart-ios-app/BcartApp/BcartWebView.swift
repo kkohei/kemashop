@@ -31,6 +31,7 @@ struct BcartWebView: UIViewRepresentable {
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
+        webView.uiDelegate = context.coordinator   // JSのalert/confirm表示・target=_blank対応
         webView.allowsBackForwardNavigationGestures = true
         context.coordinator.webView = webView
 
@@ -54,7 +55,7 @@ struct BcartWebView: UIViewRepresentable {
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
         let appState: AppState
         weak var webView: WKWebView?
         var pendingAutoLogin = false
@@ -85,6 +86,90 @@ struct BcartWebView: UIViewRepresentable {
             KeychainStore.saveCredentials(email: email, password: password)
             appState.memberKey = email
             DeviceRegistration.registerIfPossible()
+        }
+
+        // mailto: / tel: などWebで開けないリンクは外部アプリ(メール/電話)で開く
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+        ) {
+            guard let url = navigationAction.request.url else { decisionHandler(.allow); return }
+            let scheme = (url.scheme ?? "").lowercased()
+            if scheme != "http" && scheme != "https" && scheme != "about" && scheme != "blob" {
+                UIApplication.shared.open(url)
+                decisionHandler(.cancel)
+                return
+            }
+            decisionHandler(.allow)
+        }
+
+        // target="_blank" のリンクは同じWebView内で開く(未実装だと何も起きない)
+        func webView(
+            _ webView: WKWebView,
+            createWebViewWith configuration: WKWebViewConfiguration,
+            for navigationAction: WKNavigationAction,
+            windowFeatures: WKWindowFeatures
+        ) -> WKWebView? {
+            if navigationAction.targetFrame == nil {
+                webView.load(navigationAction.request)
+            }
+            return nil
+        }
+
+        // MARK: - JSダイアログ(WKWebViewは未実装だと alert/confirm を無視してしまう)
+
+        func webView(
+            _ webView: WKWebView,
+            runJavaScriptAlertPanelWithMessage message: String,
+            initiatedByFrame frame: WKFrameInfo,
+            completionHandler: @escaping () -> Void
+        ) {
+            guard let vc = Self.topViewController() else { completionHandler(); return }
+            let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler() })
+            vc.present(alert, animated: true)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            runJavaScriptConfirmPanelWithMessage message: String,
+            initiatedByFrame frame: WKFrameInfo,
+            completionHandler: @escaping (Bool) -> Void
+        ) {
+            guard let vc = Self.topViewController() else { completionHandler(false); return }
+            let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "キャンセル", style: .cancel) { _ in completionHandler(false) })
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler(true) })
+            vc.present(alert, animated: true)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            runJavaScriptTextInputPanelWithPrompt prompt: String,
+            defaultText: String?,
+            initiatedByFrame frame: WKFrameInfo,
+            completionHandler: @escaping (String?) -> Void
+        ) {
+            guard let vc = Self.topViewController() else { completionHandler(nil); return }
+            let alert = UIAlertController(title: nil, message: prompt, preferredStyle: .alert)
+            alert.addTextField { $0.text = defaultText }
+            alert.addAction(UIAlertAction(title: "キャンセル", style: .cancel) { _ in completionHandler(nil) })
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak alert] _ in
+                completionHandler(alert?.textFields?.first?.text)
+            })
+            vc.present(alert, animated: true)
+        }
+
+        /// 最前面のViewControllerを取得(アラート表示用)
+        private static func topViewController() -> UIViewController? {
+            let window = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first { $0.isKeyWindow }
+            var top = window?.rootViewController
+            while let presented = top?.presentedViewController { top = presented }
+            return top
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
