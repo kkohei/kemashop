@@ -87,13 +87,13 @@ struct WelcomeView: View {
                 }
                 .frame(maxWidth: 440)   // iPhone Duo等の広い画面でボタンが間延びしないよう上限
                 .padding(.horizontal, 40)
-                .padding(.bottom, 50)
+                .padding(.bottom, 60)
             }
-            .frame(maxWidth: .infinity) // 背景は全面、コンテンツは中央寄せ
-            // iPhone Duo内側画面では右端のステータスバー分セーフエリアが非対称になり
-            // コンテンツが左に寄るため、左右方向のみセーフエリアを無視して画面中央に揃える
-            .ignoresSafeArea(.container, edges: .horizontal)
+            .frame(maxWidth: .infinity) // コンテンツは物理画面の中央寄せ
         }
+        // iPhone Duo内側画面では右端のステータスバー分セーフエリアが非対称になり
+        // コンテンツが左に寄るため、画面全体でセーフエリアを無視して物理画面基準で配置する
+        .ignoresSafeArea()
     }
 }
 
@@ -296,8 +296,8 @@ struct LockView: View {
             }
             .buttonStyle(.borderedProminent)
         }
-        .frame(maxWidth: .infinity)
-        .ignoresSafeArea(.container, edges: .horizontal) // Duo内側画面で左右中央に揃える
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea() // Duo内側画面でも物理画面の中央に揃える
         .onAppear { unlock() }
     }
 
