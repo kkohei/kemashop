@@ -85,9 +85,11 @@ struct WelcomeView: View {
                             .overlay(Capsule().stroke(.white.opacity(0.9), lineWidth: 1.5))
                     }
                 }
+                .frame(maxWidth: 440)   // iPhone Duo等の広い画面でボタンが間延びしないよう上限
                 .padding(.horizontal, 40)
                 .padding(.bottom, 50)
             }
+            .frame(maxWidth: .infinity) // 背景は全面、コンテンツは中央寄せ
         }
     }
 }
@@ -159,6 +161,8 @@ struct BottomBar: View {
             }
             .foregroundStyle(.primary)
         }
+        .frame(maxWidth: 620)           // iPhone Duo等の広い画面でボタンが離れすぎないよう上限
+        .frame(maxWidth: .infinity)     // バーの背景自体は全幅
         .padding(.top, 8)
         .padding(.bottom, 4)
         .background(.regularMaterial)
