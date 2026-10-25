@@ -90,6 +90,9 @@ struct WelcomeView: View {
                 .padding(.bottom, 50)
             }
             .frame(maxWidth: .infinity) // 背景は全面、コンテンツは中央寄せ
+            // iPhone Duo内側画面では右端のステータスバー分セーフエリアが非対称になり
+            // コンテンツが左に寄るため、左右方向のみセーフエリアを無視して画面中央に揃える
+            .ignoresSafeArea(.container, edges: .horizontal)
         }
     }
 }
@@ -293,6 +296,8 @@ struct LockView: View {
             }
             .buttonStyle(.borderedProminent)
         }
+        .frame(maxWidth: .infinity)
+        .ignoresSafeArea(.container, edges: .horizontal) // Duo内側画面で左右中央に揃える
         .onAppear { unlock() }
     }
 
