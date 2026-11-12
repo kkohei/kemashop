@@ -78,3 +78,18 @@ Apple Developer → Keys で **APNs用 .p8 キー** を発行し、Key ID / Team
 - `AppConfig.loggedInPathHints`: ログイン後URLの実パスに合わせて調整
 - 通知タップ後の遷移先URL(`/order/history`)を実際の注文履歴パスに合わせる
 - App Store審査用に、アプリアイコン・スクリーンショット・プライバシー情報を別途用意
+
+---
+
+## ロゴ画像の追加(新しいウェルカム画面用)
+
+ウェルカム画面(アイボリー・ミニマル)は公式ロゴ `Image("kema-logo")` を使います。Mac側で次の手順を行ってください。
+
+1. `cd ~/kemashop && git pull`
+2. Xcode で `Assets.xcassets` を開く
+3. リポジトリの `bcart-ios-app/BcartApp/Resources/kema-logo.imageset` フォルダを `Assets.xcassets` にドラッグ
+   (または、名前をちょうど `kema-logo` にした Image Set を作成し、`@2x` / `@3x` の PNG を入れる)
+4. セット名が `kema-logo` であることを確認(コードの `Image("kema-logo")` と一致が必要)
+5. ビルドして実行
+
+既存の `logo` セットがある場合はそのままで構いません(新コードでは使用しません)。
