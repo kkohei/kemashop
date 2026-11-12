@@ -32,57 +32,67 @@ struct RootView: View {
     }
 }
 
-/// 初回起動画面:
-/// 流れ続けるゴールド×ピンクゴールドの背景 + 中央ロゴ + PRO SHOP + ログイン/新規登録ボタン。
+/// 初回起動画面(アイボリー・ミニマル):
+/// アイボリーの紙色グラデーション背景 + 公式ロゴ + PRO SHOP キャプション + ログイン/新規登録ボタン。
+/// ライト/ダークモードに関わらず常にこのデザインで表示する。
 struct WelcomeView: View {
     @EnvironmentObject var appState: AppState
 
+    private let ink   = Color(red: 0x1a / 255.0, green: 0x16 / 255.0, blue: 0x12 / 255.0)  // #1a1612
+    private let ivory = Color(red: 0xf7 / 255.0, green: 0xf1 / 255.0, blue: 0xe6 / 255.0)  // #f7f1e6
+    private let gold  = Color(red: 0x9a / 255.0, green: 0x7d / 255.0, blue: 0x4a / 255.0)  // #9a7d4a
+
     var body: some View {
         ZStack {
-            // 常時ゆらゆら流れる背景
-            FlowingGoldBackground()
+            background
 
             VStack(spacing: 0) {
                 Spacer()
 
-                // ロゴ(Assets に "logo" 画像を追加してください)
-                Image("logo")
+                // 公式ロゴ(黒・透過PNG)。再タイプセットや加工は行わないこと。
+                // 【Mac側セットアップ】git pull → Xcode で Assets.xcassets を開き、
+                // bcart-ios-app/BcartApp/Resources/kema-logo.imageset フォルダを Assets.xcassets にドラッグ。
+                // セット名が "kema-logo"(下の Image 名と完全一致)であることを確認して再ビルド。
+                Image("kema-logo")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 200)
-                    .padding(.bottom, 14)
+                    .frame(width: 228)
 
+                // 公式ロゴの一部ではない小さなキャプション
                 Text("PRO SHOP")
-                    .font(.system(size: 20, weight: .semibold))
-                    .tracking(8)
-                    .foregroundStyle(.white)
+                    .font(.system(size: 10, weight: .regular))
+                    .tracking(4.8)
+                    .padding(.leading, 4.8)   // 末尾の字間分を相殺して視覚的に中央へ
+                    .foregroundStyle(gold)
+                    .padding(.top, 20)
 
                 Spacer()
 
                 VStack(spacing: 14) {
-                    // ログイン(白ボタン)
+                    // ログイン(塗りつぶし)
                     Button {
                         appState.open(path: AppConfig.loginPath)
                     } label: {
                         Text("ログイン")
-                            .font(.headline)
-                            .foregroundStyle(.black)
+                            .font(.system(size: 17, weight: .medium))
+                            .tracking(2.4)
+                            .foregroundStyle(ivory)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)
-                            .background(.white, in: Capsule())
+                            .background(ink, in: Capsule())
                     }
 
-                    // 新規登録(白枠ボタン)
+                    // 新規登録(細い枠線)
                     Button {
                         appState.open(path: AppConfig.registerPath)
                     } label: {
                         Text("新規登録")
-                            .font(.headline)
-                            .foregroundStyle(.white)
+                            .font(.system(size: 17, weight: .medium))
+                            .tracking(2.4)
+                            .foregroundStyle(ink)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)
-                            .background(.white.opacity(0.12), in: Capsule())
-                            .overlay(Capsule().stroke(.white.opacity(0.9), lineWidth: 1.5))
+                            .overlay(Capsule().stroke(ink, lineWidth: 1))
                     }
                 }
                 .frame(maxWidth: 440)   // iPhone Duo等の広い画面でボタンが間延びしないよう上限
@@ -94,52 +104,32 @@ struct WelcomeView: View {
         // iPhone Duo内側画面では右端のステータスバー分セーフエリアが非対称になり
         // コンテンツが左に寄るため、画面全体でセーフエリアを無視して物理画面基準で配置する
         .ignoresSafeArea()
+        // 常にアイボリーのデザイン。ステータスバーも黒文字になる
+        .preferredColorScheme(.light)
     }
-}
 
-/// 流れ続けるゴールド×ピンクゴールドの背景。
-/// MeshGradient の格子点を TimelineView で常時サイン波で動かし、有機的に流れる効果を出す。
-struct FlowingGoldBackground: View {
-    // 濃いめ・深みのあるゴールド × ピンクゴールド
-    private let paleGold  = Color(red: 0.89, green: 0.74, blue: 0.42)
-    private let lightGold = Color(red: 0.82, green: 0.63, blue: 0.26)
-    private let gold      = Color(red: 0.72, green: 0.52, blue: 0.16)
-    private let roseGold  = Color(red: 0.78, green: 0.52, blue: 0.40)
-    private let deepGold  = Color(red: 0.50, green: 0.35, blue: 0.13)
+    private var background: some View {
+        ZStack {
+            LinearGradient(
+                stops: [
+                    .init(color: Color(red: 0xf7 / 255.0, green: 0xf1 / 255.0, blue: 0xe6 / 255.0), location: 0),
+                    .init(color: Color(red: 0xf3 / 255.0, green: 0xea / 255.0, blue: 0xd9 / 255.0), location: 0.48),
+                    .init(color: Color(red: 0xef / 255.0, green: 0xe4 / 255.0, blue: 0xd0 / 255.0), location: 1)
+                ],
+                startPoint: .top, endPoint: .bottom)
 
-    var body: some View {
-        if #available(iOS 18.0, *) {
-            TimelineView(.animation) { timeline in
-                mesh(timeline.date.timeIntervalSinceReferenceDate)
+            // 上部中央のやわらかなハイライト(ellipse 80% 60% at 50% 0%)
+            GeometryReader { geo in
+                RadialGradient(
+                    colors: [Color(red: 1, green: 0xfd / 255.0, blue: 0xf8 / 255.0), .clear],
+                    center: .init(x: 0.5, y: 0),
+                    startRadius: 0,
+                    endRadius: geo.size.width * 0.8)
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .scaleEffect(x: 1, y: 0.75, anchor: .top)
             }
-            .ignoresSafeArea()
-        } else {
-            // iOS 17 以前のフォールバック(静的グラデーション)
-            LinearGradient(colors: [paleGold, lightGold, roseGold, gold, deepGold],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
-                .ignoresSafeArea()
         }
-    }
-
-    @available(iOS 18.0, *)
-    private func mesh(_ t: TimeInterval) -> some View {
-        func p(_ x: Double, _ y: Double) -> SIMD2<Float> { SIMD2(Float(x), Float(y)) }
-        // 異なる周期のサイン波で格子点を揺らす → ずっと流れ続ける
-        let a = sin(t * 0.45), b = cos(t * 0.37)
-        let c = sin(t * 0.60), d = cos(t * 0.52)
-        return MeshGradient(
-            width: 3, height: 3,
-            points: [
-                p(0, 0),                p(0.5 + 0.10 * a, 0),               p(1, 0),
-                p(0, 0.5 + 0.10 * b),   p(0.5 + 0.12 * c, 0.5 + 0.12 * d),  p(1, 0.5 - 0.10 * b),
-                p(0, 1),                p(0.5 - 0.10 * a, 1),               p(1, 1)
-            ],
-            colors: [
-                paleGold,  lightGold, roseGold,
-                gold,      roseGold,  gold,
-                deepGold,  gold,      lightGold
-            ]
-        )
+        .ignoresSafeArea()
     }
 }
 
