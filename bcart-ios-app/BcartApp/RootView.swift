@@ -87,8 +87,8 @@ struct IvoryBackground: View {
 
 /// 動きのあるアイボリー背景(Welcome / ロック画面で共通)。
 /// 静的な IvoryBackground の上に、ごく淡い3層のアニメーションを重ねる:
-///  1. シャンパン/ベージュ系のぼかした光だまりが、20〜40秒周期でゆっくり漂う(メッシュグラデーション風)
-///  2. 約11秒ごとに、斜めの淡い光の帯(シーン)が一度だけ画面を横切る
+///  1. シャンパン/ベージュ系のぼかした光だまりが、20〜40秒8〜15秒周期で大きく漂う(メッシュグラデーション風)
+///  2. 約6秒ごとに、斜めの淡い光の帯(シーン)が一度だけ画面を横切る
 ///  3. 小さな金色の粒子がゆっくり上へ浮かび、左右にかすかに揺れる
 /// 文字の可読性を損なわないよう、すべて低い不透明度に抑えている。
 /// 「視差効果を減らす(Reduce Motion)」がオンの場合は静止画で表示する。
@@ -141,22 +141,22 @@ private struct IvoryAmbientLayer: View {
     }
 
     private static let blobs: [Blob] = [
-        Blob(color: rgb(0xec, 0xd8, 0xb0), alpha: 0.42, center: CGPoint(x: 0.22, y: 0.28),
-             amplitude: CGSize(width: 0.16, height: 0.10), period: CGSize(width: 31, height: 23),
-             phase: 0.0, radius: 0.55),
-        Blob(color: rgb(0xff, 0xfb, 0xf2), alpha: 0.70, center: CGPoint(x: 0.78, y: 0.20),
-             amplitude: CGSize(width: 0.12, height: 0.12), period: CGSize(width: 27, height: 37),
-             phase: 1.7, radius: 0.50),
-        Blob(color: rgb(0xe6, 0xcf, 0xa2), alpha: 0.32, center: CGPoint(x: 0.70, y: 0.78),
-             amplitude: CGSize(width: 0.18, height: 0.08), period: CGSize(width: 39, height: 29),
-             phase: 3.1, radius: 0.60),
-        Blob(color: rgb(0xf3, 0xe4, 0xc6), alpha: 0.45, center: CGPoint(x: 0.25, y: 0.82),
-             amplitude: CGSize(width: 0.10, height: 0.12), period: CGSize(width: 25, height: 33),
-             phase: 4.6, radius: 0.48)
+        Blob(color: rgb(0xe2, 0xc4, 0x8a), alpha: 0.55, center: CGPoint(x: 0.22, y: 0.28),
+             amplitude: CGSize(width: 0.30, height: 0.18), period: CGSize(width: 11, height: 8),
+             phase: 0.0, radius: 0.50),
+        Blob(color: rgb(0xff, 0xfb, 0xf2), alpha: 0.85, center: CGPoint(x: 0.78, y: 0.22),
+             amplitude: CGSize(width: 0.26, height: 0.20), period: CGSize(width: 9, height: 13),
+             phase: 1.7, radius: 0.45),
+        Blob(color: rgb(0xd9, 0xb7, 0x7a), alpha: 0.45, center: CGPoint(x: 0.70, y: 0.76),
+             amplitude: CGSize(width: 0.32, height: 0.16), period: CGSize(width: 15, height: 10),
+             phase: 3.1, radius: 0.55),
+        Blob(color: rgb(0xea, 0xd2, 0xa4), alpha: 0.55, center: CGPoint(x: 0.25, y: 0.80),
+             amplitude: CGSize(width: 0.24, height: 0.20), period: CGSize(width: 8, height: 12),
+             phase: 4.6, radius: 0.45)
     ]
 
-    private static let particleCount = 22
-    private static let particleColor = rgb(0xb8, 0x96, 0x5a)
+    private static let particleCount = 40
+    private static let particleColor = rgb(0xa8, 0x84, 0x48)
 
     /// 0〜1 の決定的な疑似乱数(粒子の初期配置用)
     private static func seeded(_ i: Int, _ k: Int) -> Double {
@@ -188,11 +188,11 @@ private struct IvoryAmbientLayer: View {
                                                    startRadius: 0, endRadius: r))
             }
 
-            // 2. 斜めの光の帯(周期の前半 40% だけ横切り、残りは休止)
+            // 2. 斜めの光の帯(周期の前半 50% だけ横切り、残りは休止)
             if showsSheen {
-                let cycle = 11.0
-                let progress = (time + 2.0).truncatingRemainder(dividingBy: cycle) / cycle
-                let sweep = progress / 0.4
+                let cycle = 6.0
+                let progress = (time + 1.0).truncatingRemainder(dividingBy: cycle) / cycle
+                let sweep = progress / 0.5
                 if sweep < 1 {
                     let eased = sweep * sweep * (3 - 2 * sweep)              // smoothstep
                     let dir = CGVector(dx: 0.857, dy: 0.514)                 // 右下がりの斜め方向(単位ベクトル)
@@ -202,7 +202,7 @@ private struct IvoryAmbientLayer: View {
                     let c = CGPoint(x: dir.dx * s, y: dir.dy * s)
                     let start = CGPoint(x: c.x - dir.dx * band / 2, y: c.y - dir.dy * band / 2)
                     let end = CGPoint(x: c.x + dir.dx * band / 2, y: c.y + dir.dy * band / 2)
-                    let strength = 0.26 * sin(Double.pi * sweep)            // 入り/抜けをフェード
+                    let strength = 0.45 * sin(Double.pi * sweep)            // 入り/抜けをフェード
                     let gradient = Gradient(stops: [
                         .init(color: .white.opacity(0), location: 0),
                         .init(color: .white.opacity(strength), location: 0.5),
@@ -218,15 +218,15 @@ private struct IvoryAmbientLayer: View {
             for i in 0..<Self.particleCount {
                 let baseX = Self.seeded(i, 1)
                 let offset = Self.seeded(i, 2)
-                let speed = Double(h) / (45 + 35 * Self.seeded(i, 3))   // 画面高さを45〜80秒で上昇
-                let sizePt = 1.5 + 1.6 * Self.seeded(i, 4)
-                let alpha = 0.14 + 0.22 * Self.seeded(i, 5)
-                let swayPeriod = 7 + 6 * Self.seeded(i, 6)
+                let speed = Double(h) / (15 + 15 * Self.seeded(i, 3))   // 画面高さを15〜30秒で上昇
+                let sizePt = 2.0 + 2.0 * Self.seeded(i, 4)
+                let alpha = 0.30 + 0.30 * Self.seeded(i, 5)
+                let swayPeriod = 4 + 4 * Self.seeded(i, 6)
 
                 var yTravel = (time * speed + offset * travelH).truncatingRemainder(dividingBy: travelH)
                 if yTravel < 0 { yTravel += travelH }
                 let y = Double(h) + 20 - yTravel
-                let x = baseX * Double(w) + 14 * sin(twoPi * time / swayPeriod + offset * twoPi)
+                let x = baseX * Double(w) + 22 * sin(twoPi * time / swayPeriod + offset * twoPi)
 
                 // 上下端に近いほど薄くする
                 let edge = min(max(y / Double(h), 0), 1)
