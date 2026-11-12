@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 常にライト。起動時のちらつき防止にアイボリーの背景を指定 -->
+    <style name="Theme.Kema" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowBackground">#F7F1E6</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

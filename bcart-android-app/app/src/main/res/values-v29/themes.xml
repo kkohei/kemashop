@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 端末の強制ダークモードで配色が反転しないようにする -->
+    <style name="Theme.Kema" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowBackground">#F7F1E6</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
+</resources>
