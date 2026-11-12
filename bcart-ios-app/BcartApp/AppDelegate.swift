@@ -57,15 +57,36 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let info = response.notification.request.content.userInfo
-        if let path = info["url"] as? String {
-            NotificationCenter.default.post(name: .openDeepLink, object: path)
-        }
+        // 検証(店舗ホスト/相対パスのみ)は DeepLinkInbox 内で行う
+        DeepLinkInbox.shared.push(info["url"] as? String)
         completionHandler()
     }
 }
 
 extension Notification.Name {
     static let openDeepLink = Notification.Name("openDeepLink")
+}
+
+/// ディープリンクの受け口。通知タップ・下部バーから push され、検証済みパスを保持する。
+/// AppState の生成前(コールドスタート)に届いても取りこぼさないよう、静的に保持する。
+final class DeepLinkInbox {
+    static let shared = DeepLinkInbox()
+    private var path: String?
+
+    /// 検証に通れば保持して通知する(不正な URL は黙って捨てる)
+    func push(_ raw: String?) {
+        guard let url = AppConfig.shopURL(from: raw) else { return }
+        let full = url.absoluteString
+        DispatchQueue.main.async {
+            self.path = full
+            NotificationCenter.default.post(name: .openDeepLink, object: nil)
+        }
+    }
+
+    func take() -> String? {
+        defer { path = nil }
+        return path
+    }
 }
 
 /// デバイストークンの一時保持

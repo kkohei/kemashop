@@ -7,25 +7,33 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        Group {
-            switch appState.route {
-            case .welcome:
+        ZStack {
+            if appState.route == .welcome {
                 WelcomeView()
-            case .locked:
-                LockView()
-            case .web:
+            } else {
+                // Welcome を抜けたら(.web / .locked)WebView と下部バーは常にマウントしたままにする。
+                // ロック中も破棄しないので、カート/フォーム状態が保たれ、ロック中に届いた通知も処理できる。
                 VStack(spacing: 0) {
                     BcartWebView()
                     BottomBar()
                 }
+                .allowsHitTesting(appState.route == .web)
+                .accessibilityHidden(appState.route == .locked)
+                // 設定シートは解錠中のみ(シートはオーバーレイより前面に出てしまうため、ロック時に閉じる)
                 .sheet(isPresented: $appState.showSettings) {
                     SettingsView().environmentObject(appState)
+                }
+
+                // ロック画面はWebViewの上に重ねるオーバーレイ
+                if appState.route == .locked {
+                    LockView()
                 }
             }
         }
         .onChange(of: scenePhase) { newPhase in
-            // バックグラウンドへ移動したら、認証情報がある場合は再ロック
-            if newPhase == .background, KeychainStore.hasCredentials {
+            // バックグラウンドへ移動したら、認証情報がある場合は再ロック(WebViewは破棄しない)
+            if newPhase == .background, KeychainStore.hasCredentials, appState.route == .web {
+                appState.showSettings = false
                 appState.route = .locked
             }
         }
@@ -232,32 +240,46 @@ struct SettingsView: View {
                 Text("この操作でアカウント削除を申請します。数営業日以内に削除いたします。よろしいですか？")
             }
             .alert("申請を受け付けました", isPresented: $done) {
-                Button("OK") { dismiss() }
+                // 申請後はログアウトして Welcome へ戻る
+                Button("OK") {
+                    performLocalLogout()
+                    dismiss()
+                }
             } message: {
                 Text("退会申請を受け付けました。削除完了までお待ちください。")
             }
         }
     }
 
+    /// 退会申請: 申請送信 → 端末登録解除。完了アラートのOK後に ログアウト → 閉じる。
     private func submit() {
-        DeletionRequest.submit(
-            memberKey: KeychainStore.loadMemberKey(),
-            deviceToken: PushTokenStore.shared.deviceToken
-        )
+        let member = KeychainStore.loadMemberKey()
+        let token = PushTokenStore.shared.deviceToken
+        DeletionRequest.submit(memberKey: member, deviceToken: token)
+        DeviceRegistration.unregister(memberKey: member, deviceToken: token)
         done = true
     }
 
-    /// ログアウト: 保存した認証情報とWebViewのログインCookieを消し、最初のWelcome画面に戻る。
+    /// ログアウト: 端末登録を解除し、保存した認証情報とWebViewのログインCookieを消し、最初のWelcome画面に戻る。
     private func logout() {
+        DeviceRegistration.unregister(
+            memberKey: KeychainStore.loadMemberKey(),
+            deviceToken: PushTokenStore.shared.deviceToken
+        )
+        performLocalLogout()
+        dismiss()
+    }
+
+    private func performLocalLogout() {
         KeychainStore.clearCredentials()
         appState.memberKey = nil
+        appState.pendingPath = nil
         let types = WKWebsiteDataStore.allWebsiteDataTypes()
         let store = WKWebsiteDataStore.default()
         store.fetchDataRecords(ofTypes: types) { records in
             store.removeData(ofTypes: types, for: records) {}
         }
         appState.route = .welcome
-        dismiss()
     }
 }
 
@@ -268,6 +290,7 @@ enum DeletionRequest {
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        DeviceRegistration.applyAppToken(&req)
         let body: [String: Any] = [
             "memberId": memberKey ?? "",
             "deviceToken": deviceToken ?? "",
@@ -284,7 +307,7 @@ struct BarButton: View {
 
     var body: some View {
         Button {
-            NotificationCenter.default.post(name: .openDeepLink, object: path)
+            DeepLinkInbox.shared.push(path)   // 検証 → pendingPath 経由で開く
         } label: {
             VStack(spacing: 3) {
                 Image(systemName: systemImage).font(.system(size: 20))
