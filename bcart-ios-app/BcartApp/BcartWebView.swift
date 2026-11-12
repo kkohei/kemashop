@@ -1,8 +1,12 @@
 import SwiftUI
 import WebKit
+import QuickLook
+import Combine
 
 /// Bカートを表示する WKWebView。
-/// - ログインフォーム送信時に メール+パスワード を捕捉し Keychain に保存
+/// - ログインフォーム送信時に メール+パスワード を一時保持し、ログイン後ページへ到達してから Keychain に保存
+/// - 店舗ホスト(kema.i17.bcart.jp)以外はアプリ内で開かず Safari へ
+/// - PDF/添付ファイルは WKDownload で一時保存し QuickLook でプレビュー
 /// - 起動時、保存済み認証情報があればログイン画面を開いて自動入力・自動送信(方式B: Face IDでログイン)
 /// - プッシュ通知タップ時のディープリンクで該当ページへ遷移
 struct BcartWebView: UIViewRepresentable {
@@ -14,7 +18,7 @@ struct BcartWebView: UIViewRepresentable {
         let controller = WKUserContentController()
         controller.add(context.coordinator, name: "memberCapture")
         controller.addUserScript(
-            WKUserScript(source: Coordinator.captureJS, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
+            WKUserScript(source: Coordinator.captureJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         )
         // アプリ内でのみ、新規登録/ログインフォームをモバイル最適化
         controller.addUserScript(
@@ -48,44 +52,77 @@ struct BcartWebView: UIViewRepresentable {
         } else {
             start = appState.startPath.isEmpty ? "/" : appState.startPath
         }
-        let url = URL(string: start, relativeTo: AppConfig.bcartURL) ?? AppConfig.bcartURL
+        let url = AppConfig.shopURL(from: start) ?? AppConfig.bcartURL
         webView.load(URLRequest(url: url))
+        context.coordinator.consumePendingIfPossible()
         return webView
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate, WKDownloadDelegate {
         let appState: AppState
         weak var webView: WKWebView?
         var pendingAutoLogin = false
+        /// 自動ログインを送信した直後(次のページ読込完了までは保留中のディープリンクを開かない)
+        private var autoLoginInFlight = false
+        private var cancellables = Set<AnyCancellable>()
+
+        /// 送信されたが未確定の認証情報。ログイン後ページへ到達するまで Keychain には保存しない。
+        private var stashed: (email: String, password: String, at: Date)?
+        private static let stashLifetime: TimeInterval = 120
+
+        // ダウンロード関連
+        private var downloadDestinations: [ObjectIdentifier: URL] = [:]
+        private var previewer: DownloadPreviewer?
+        private static let downloadRoot = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("kema-downloads", isDirectory: true)
 
         init(appState: AppState) {
             self.appState = appState
             super.init()
-            NotificationCenter.default.addObserver(
-                self, selector: #selector(handleDeepLink(_:)), name: .openDeepLink, object: nil
-            )
+            // 前回の取り残しファイルを掃除
+            try? FileManager.default.removeItem(at: Self.downloadRoot)
+            // 解錠(.web)かつ保留パスがあれば開く。ロックされたら開いているプレビューを閉じる。
+            // (appState は強参照だが appState → Coordinator の参照は無いので循環しない)
+            appState.$route.combineLatest(appState.$pendingPath)
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] route, _ in
+                    if route == .locked { self?.previewer?.dismiss() }
+                    self?.consumePendingIfPossible()
+                }
+                .store(in: &cancellables)
         }
 
         @objc func reload() { webView?.reload() }
 
-        @objc func handleDeepLink(_ note: Notification) {
-            guard let path = note.object as? String,
-                  let url = URL(string: path, relativeTo: AppConfig.bcartURL) else { return }
-            webView?.load(URLRequest(url: url))
+        /// 保留中のパスを、WebView準備済み・解錠済み・自動ログイン完了後に1度だけ開く
+        func consumePendingIfPossible() {
+            guard appState.route == .web, let webView,
+                  !pendingAutoLogin, !autoLoginInFlight,
+                  let path = appState.pendingPath else { return }
+            appState.pendingPath = nil
+            guard let url = AppConfig.shopURL(from: path) else { return }
+            webView.load(URLRequest(url: url))
         }
 
-        // ログインフォーム送信時に メール+パスワード を受け取り保存
+        // ログインフォーム送信時に メール+パスワード を受け取る(ここでは保存せず一時保持のみ)
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard message.name == "memberCapture",
+            // 店舗のメインフレーム以外からのメッセージは無視
+            guard message.frameInfo.isMainFrame,
+                  message.frameInfo.securityOrigin.host.lowercased() == AppConfig.shopHost,
+                  AppConfig.isShopURL(webView?.url),
+                  message.name == "memberCapture",
                   let dict = message.body as? [String: Any],
                   let email = (dict["email"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
                   let password = dict["password"] as? String,
                   !email.isEmpty, !password.isEmpty else { return }
-            KeychainStore.saveCredentials(email: email, password: password)
-            appState.memberKey = email
-            DeviceRegistration.registerIfPossible()
+            stashed = (email, password, Date())
+        }
+
+        /// Safari 等の外部アプリで開く
+        private func openExternally(_ url: URL) {
+            UIApplication.shared.open(url)
         }
 
         // mailto: / tel: などWebで開けないリンクは外部アプリ(メール/電話)で開く
@@ -96,12 +133,74 @@ struct BcartWebView: UIViewRepresentable {
         ) {
             guard let url = navigationAction.request.url else { decisionHandler(.allow); return }
             let scheme = (url.scheme ?? "").lowercased()
-            if scheme != "http" && scheme != "https" && scheme != "about" && scheme != "blob" {
-                UIApplication.shared.open(url)
+            if scheme == "http" || scheme == "https" {
+                guard AppConfig.isShopURL(url) else {
+                    // 店舗以外のホストはアプリ内に留めない。
+                    // メインフレーム/ユーザー操作のときだけ Safari を開き、iframe の読込は黙って止める。
+                    if navigationAction.targetFrame?.isMainFrame ?? true
+                        || navigationAction.navigationType == .linkActivated {
+                        openExternally(url)
+                    }
+                    decisionHandler(.cancel)
+                    return
+                }
+                // <a download> 等のダウンロード指定(iOS 14.5+)
+                if navigationAction.shouldPerformDownload {
+                    decisionHandler(.download)
+                    return
+                }
+                decisionHandler(.allow)
+                return
+            }
+            if scheme != "about" && scheme != "blob" {
+                openExternally(url)
                 decisionHandler(.cancel)
                 return
             }
             decisionHandler(.allow)
+        }
+
+        // PDF・添付ファイルはダウンロードして QuickLook で表示する
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationResponse: WKNavigationResponse,
+            decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
+        ) {
+            let response = navigationResponse.response
+            guard Self.shouldDownload(response: response, canShow: navigationResponse.canShowMIMEType) else {
+                decisionHandler(.allow)
+                return
+            }
+            // 店舗ホストからのレスポンスのみダウンロード(それ以外は取得せず中止)
+            decisionHandler(AppConfig.isShopURL(response.url) ? .download : .cancel)
+        }
+
+        private static let downloadMIMETypes: Set<String> = [
+            "application/pdf", "application/zip", "application/x-zip-compressed",
+            "application/octet-stream", "text/csv",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ]
+
+        private static func shouldDownload(response: URLResponse, canShow: Bool) -> Bool {
+            if let http = response as? HTTPURLResponse,
+               let disp = http.value(forHTTPHeaderField: "Content-Disposition")?.lowercased(),
+               disp.contains("attachment") {
+                return true
+            }
+            let mime = (response.mimeType ?? "").lowercased()
+            if downloadMIMETypes.contains(mime) { return true }
+            return !canShow
+        }
+
+        func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+            download.delegate = self
+        }
+
+        func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+            download.delegate = self
         }
 
         // target="_blank" のリンクは同じWebView内で開く(未実装だと何も起きない)
@@ -111,8 +210,13 @@ struct BcartWebView: UIViewRepresentable {
             for navigationAction: WKNavigationAction,
             windowFeatures: WKWindowFeatures
         ) -> WKWebView? {
-            if navigationAction.targetFrame == nil {
-                webView.load(navigationAction.request)
+            if navigationAction.targetFrame == nil, let url = navigationAction.request.url {
+                let scheme = (url.scheme ?? "").lowercased()
+                if AppConfig.isShopURL(url) {
+                    webView.load(navigationAction.request)   // 店舗は同じWebViewで開く
+                } else if scheme != "about" && scheme != "blob" {
+                    openExternally(url)                      // 他ホスト/mailto等は外部で開く
+                }
             }
             return nil
         }
@@ -174,23 +278,113 @@ struct BcartWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             webView.scrollView.refreshControl?.endRefreshing()
-            let path = webView.url?.path ?? ""
+            autoLoginInFlight = false
+            let isShop = AppConfig.isShopURL(webView.url)
+            let path = (webView.url?.path ?? "").lowercased()
+            let onLogin = path.contains("login")
 
-            // 自動ログイン: ログイン画面が開いたら、保存済み認証情報を入力して送信
-            if pendingAutoLogin, path.contains("login"), let cred = KeychainStore.loadCredentials() {
+            // 自動ログイン: 店舗のログイン画面が開いたら、保存済み認証情報を入力して送信
+            if pendingAutoLogin, isShop, onLogin, let cred = KeychainStore.loadCredentials() {
                 pendingAutoLogin = false
+                autoLoginInFlight = true
                 webView.evaluateJavaScript(Self.autoLoginJS(email: cred.email, password: cred.password))
+                // フォームが送信されなかった場合に保留リンクを塞がないための保険
+                DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+                    self?.autoLoginInFlight = false
+                    self?.consumePendingIfPossible()
+                }
             }
 
-            // ログイン後ページに到達したら端末登録を試みる
-            if AppConfig.loggedInPathHints.contains(where: { path.contains($0) }) {
+            // 一時保持した認証情報の扱い:
+            //  店舗のログイン/登録画面から離れた(成功や登録完了の着地) → Keychain保存 + 端末登録
+            //  ログイン画面に留まった(失敗) / 120秒経過 → 破棄(既存の正しい認証情報は上書きしない)
+            //  /mypage 以外の着地(トップなど)でも保存できるよう、hints のみには依存しない。
+            let loggedIn = isShop && AppConfig.loggedInPathHints.contains(where: { path.contains($0) })
+            let leftAuthPages = isShop && !onLogin && !path.contains("regist")
+            if let st = stashed {
+                if Date().timeIntervalSince(st.at) > Self.stashLifetime || (isShop && onLogin) {
+                    stashed = nil
+                } else if leftAuthPages {
+                    stashed = nil
+                    KeychainStore.saveCredentials(email: st.email, password: st.password)
+                    appState.memberKey = st.email
+                    DeviceRegistration.registerIfPossible()
+                }
+            }
+
+            // 既存ログインでマイページ等に到達した場合も端末登録を試みる
+            if loggedIn {
                 DeviceRegistration.registerIfPossible()
             }
+
+            consumePendingIfPossible()
+        }
+
+        // MARK: - ダウンロード(WKDownloadDelegate)
+
+        func download(
+            _ download: WKDownload,
+            decideDestinationUsing response: URLResponse,
+            suggestedFilename: String,
+            completionHandler: @escaping (URL?) -> Void
+        ) {
+            guard AppConfig.isShopURL(response.url) else { completionHandler(nil); return }
+            var name = (suggestedFilename as NSString).lastPathComponent
+                .replacingOccurrences(of: "/", with: "_")
+            if name.isEmpty || name == "." || name == ".." { name = "download" }
+            let dir = Self.downloadRoot.appendingPathComponent(UUID().uuidString, isDirectory: true)
+            do {
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            } catch {
+                completionHandler(nil)
+                return
+            }
+            let dest = dir.appendingPathComponent(name)
+            downloadDestinations[ObjectIdentifier(download)] = dest
+            completionHandler(dest)
+        }
+
+        // ダウンロード中のリダイレクト先も店舗ホストに限定
+        func download(
+            _ download: WKDownload,
+            willPerformHTTPRedirection response: HTTPURLResponse,
+            newRequest request: URLRequest,
+            decisionHandler: @escaping (WKDownload.RedirectPolicy) -> Void
+        ) {
+            decisionHandler(AppConfig.isShopURL(request.url) ? .allow : .cancel)
+        }
+
+        func downloadDidFinish(_ download: WKDownload) {
+            guard let dest = downloadDestinations.removeValue(forKey: ObjectIdentifier(download)) else { return }
+            // ロック中はプレビューを出さず破棄
+            guard appState.route == .web, let vc = Self.topViewController() else {
+                try? FileManager.default.removeItem(at: dest.deletingLastPathComponent())
+                return
+            }
+            let previewer = DownloadPreviewer(fileURL: dest)
+            self.previewer = previewer
+            let ql = QLPreviewController()
+            ql.dataSource = previewer
+            ql.delegate = previewer
+            previewer.controller = ql
+            vc.present(ql, animated: true)
+        }
+
+        func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
+            if let dest = downloadDestinations.removeValue(forKey: ObjectIdentifier(download)) {
+                try? FileManager.default.removeItem(at: dest.deletingLastPathComponent())
+            }
+            guard (error as NSError).code != NSURLErrorCancelled, let vc = Self.topViewController() else { return }
+            let alert = UIAlertController(title: "ダウンロードできませんでした",
+                                          message: "しばらくしてからもう一度お試しください。", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            vc.present(alert, animated: true)
         }
 
         /// ログインフォームから メール+パスワード を捕捉するJS
         static let captureJS = """
         (function(){
+          if (location.hostname !== 'kema.i17.bcart.jp') return;
           document.addEventListener('submit', function(){
             var email=null, pass=null, inputs=document.querySelectorAll('input');
             for (var i=0;i<inputs.length;i++){
@@ -344,14 +538,39 @@ struct BcartWebView: UIViewRepresentable {
         })();
         """
 
-        /// JS文字列リテラルとして安全にエスケープ
+        /// JS文字列リテラルとして安全にエスケープ(JSONエンコード。改行等もそのまま保持)
         static func jsString(_ s: String) -> String {
-            let escaped = s
-                .replacingOccurrences(of: "\\", with: "\\\\")
-                .replacingOccurrences(of: "'", with: "\\'")
-                .replacingOccurrences(of: "\n", with: "")
-                .replacingOccurrences(of: "\r", with: "")
-            return "'\(escaped)'"
+            guard let data = try? JSONSerialization.data(withJSONObject: s, options: [.fragmentsAllowed]),
+                  let literal = String(data: data, encoding: .utf8) else { return "\"\"" }
+            // U+2028/2029 は古いJS実装で文字列を壊すため念のためエスケープ
+            return literal
+                .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+                .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
         }
+    }
+}
+
+/// ダウンロードしたファイルの QuickLook プレビュー。閉じたら一時ファイルを削除する。
+/// (QLPreviewController は dataSource/delegate を弱参照するため Coordinator が強参照で保持)
+final class DownloadPreviewer: NSObject, QLPreviewControllerDataSource, QLPreviewControllerDelegate {
+    let fileURL: URL
+    weak var controller: QLPreviewController?
+
+    init(fileURL: URL) { self.fileURL = fileURL }
+
+    func dismiss() {
+        controller?.dismiss(animated: false) { [fileURL] in
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+        }
+    }
+
+    func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
+
+    func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+        fileURL as NSURL
+    }
+
+    func previewControllerDidDismiss(_ controller: QLPreviewController) {
+        try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
     }
 }

@@ -34,6 +34,11 @@ final class AppState: ObservableObject {
         didSet { if let memberKey { KeychainStore.saveMemberKey(memberKey) } }
     }
 
+    /// 通知タップ等で届いた検証済みの遷移先。WebViewが準備済み かつ 解錠済み(.web)になってから1度だけ開いて消す。
+    @Published var pendingPath: String?
+
+    private var deepLinkObserver: AnyCancellable?
+
     init() {
         memberKey = KeychainStore.loadMemberKey()
         if KeychainStore.hasCredentials {
@@ -43,11 +48,16 @@ final class AppState: ObservableObject {
             route = .welcome         // 初回 → ロゴ画面
             startPath = "/"
         }
+        pendingPath = DeepLinkInbox.shared.take()
+        deepLinkObserver = NotificationCenter.default.publisher(for: .openDeepLink)
+            .sink { [weak self] _ in
+                if let p = DeepLinkInbox.shared.take() { self?.pendingPath = p }
+            }
     }
 
     /// 指定パスをWebViewで開く(Welcome画面のボタンから使用)
     func open(path: String) {
-        startPath = path
+        startPath = AppConfig.shopURL(from: path) != nil ? path : "/"
         route = .web
     }
 }
