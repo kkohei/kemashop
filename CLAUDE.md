@@ -26,12 +26,20 @@
   プッシュはFCM(Firebase設定が必要。google-services.json は app/ に配置、リポジトリには含めない)。
 - `docs/bcart-ios-app/` … 設計書・申請ガイド・告知記事HTML。
 
+## ブランチ運用(重要)
+
+- `main` は現在ほぼ空。**実コードは `claude/amazing-allen-e0mjyv` にある**。
+- 設計・修正用のブランチ(例: `fix/relay-security`)は、この `claude/amazing-allen-e0mjyv` に対するPRとして出す。
+- Mac / VPS で盲目的に `git pull`(= main)しない。必ず対象ブランチを確認してから反映する:
+  `git fetch && git checkout <branch> && git pull`
+
 ## 運用メモ
 
 - 出荷通知: Bカートで発送状況を「発送済」にすると自動でプッシュ送信(logistics[].status === '発送済')
 - 会員の識別キー: customer_id と customer_email の両方で端末照合
-- サーバー反映手順: `ssh xserver` → `cd ~/kemashop/bcart-relay-server && git pull && pm2 restart bcart-relay`
-- iOSアプリはXcodeがリポジトリのファイルを「参照」しているため、Mac側は `cd ~/kemashop && git pull` → Xcodeで再ビルドのみ
+- サーバー反映手順: `ssh xserver` → `cd ~/kemashop/bcart-relay-server && git fetch && git checkout <branch> && git pull && npm install --omit=dev && pm2 restart bcart-relay`(branch は上記ブランチ運用を参照)
+- 端末登録は `ALLOW_LEGACY_DEVICE_REGISTER=true`(既定)のまま運用し、`X-App-Token` を送る更新版アプリ配布後に `false` へ(詳細は bcart-relay-server/README.md)
+- iOSアプリはXcodeがリポジトリのファイルを「参照」しているため、Mac側は `cd ~/kemashop && git fetch && git checkout <branch> && git pull` → Xcodeで再ビルドのみ
 
 ## 注意
 

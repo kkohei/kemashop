@@ -1,1 +1,21 @@
 bcart-android-app/app/google-services.json
+
+# --- macOS / Xcode ---
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# --- Android / Gradle / IDE ---
+local.properties
+*.iml
+.idea/
+build/
+.gradle/
+captures/
+*.apk
+*.aab
+
+# --- Node ---
+node_modules/
+.env

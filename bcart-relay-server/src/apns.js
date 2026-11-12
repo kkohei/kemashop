@@ -42,11 +42,22 @@ export async function sendPush(deviceToken, message) {
   return res;
 }
 
+const APNS_TIMEOUT_MS = 10_000;
+
 function sendToHost(host, deviceToken, { title, body, badge, data = {} }) {
   return new Promise((resolve) => {
     const client = http2.connect(host);
+    // APNs が応答しなくても永久に待たないよう全体でタイムアウトを設ける
+    const timer = setTimeout(() => {
+      resolve({ ok: false, status: 0, reason: 'timeout', deviceToken });
+      client.destroy();
+    }, APNS_TIMEOUT_MS);
+    const done = (r) => {
+      clearTimeout(timer);
+      resolve(r);
+    };
     client.on('error', (err) => {
-      resolve({ ok: false, status: 0, reason: err.message, deviceToken });
+      done({ ok: false, status: 0, reason: err.message, deviceToken });
     });
 
     const payload = JSON.stringify({
@@ -59,10 +70,19 @@ function sendToHost(host, deviceToken, { title, body, badge, data = {} }) {
       ...data,
     });
 
+    let token;
+    try {
+      token = providerToken();
+    } catch (err) {
+      done({ ok: false, status: 0, reason: err.message, deviceToken });
+      client.destroy();
+      return;
+    }
+
     const req = client.request({
       ':method': 'POST',
-      ':path': `/3/device/${deviceToken}`,
-      authorization: `bearer ${providerToken()}`,
+      ':path': `/3/device/${encodeURIComponent(deviceToken)}`,
+      authorization: `bearer ${token}`,
       'apns-topic': config.apns.bundleId,
       'apns-push-type': 'alert',
       'content-type': 'application/json',
@@ -79,18 +99,18 @@ function sendToHost(host, deviceToken, { title, body, badge, data = {} }) {
     req.on('end', () => {
       client.close();
       if (status === 200) {
-        resolve({ ok: true, status, deviceToken });
+        done({ ok: true, status, deviceToken });
       } else {
         let reason = respBody;
         try {
           reason = JSON.parse(respBody).reason || respBody;
         } catch {}
-        resolve({ ok: false, status, reason, deviceToken });
+        done({ ok: false, status, reason, deviceToken });
       }
     });
     req.on('error', (err) => {
       client.close();
-      resolve({ ok: false, status: 0, reason: err.message, deviceToken });
+      done({ ok: false, status: 0, reason: err.message, deviceToken });
     });
 
     req.write(payload);

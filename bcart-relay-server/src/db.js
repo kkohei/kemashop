@@ -1,12 +1,17 @@
-import Database from 'better-sqlite3';
+import { openDatabase } from './sqlite.js';
+import { config } from './config.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const DATA_DIR = path.resolve('data');
-fs.mkdirSync(DATA_DIR, { recursive: true });
+let dbFile = config.dbPath;
+if (!dbFile) {
+  const DATA_DIR = path.resolve('data');
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  dbFile = path.join(DATA_DIR, 'relay.sqlite');
+}
 
-const db = new Database(path.join(DATA_DIR, 'relay.sqlite'));
-db.pragma('journal_mode = WAL');
+const db = openDatabase(dbFile);
+if (dbFile !== ':memory:') db.pragma('journal_mode = WAL');
 
 // 会員ID ⇄ デバイストークンの対応表
 // 1人の会員が複数端末を持てるよう (member_id, device_token) を一意にする
@@ -87,6 +92,20 @@ const stmtTokensByMember = db.prepare(
 
 const stmtDeleteToken = db.prepare(`DELETE FROM devices WHERE device_token = ?`);
 
+const stmtDeleteOtherMembers = db.prepare(
+  `DELETE FROM devices WHERE device_token = ? AND member_id != ?`
+);
+const stmtDeleteTokenMember = db.prepare(
+  `DELETE FROM devices WHERE device_token = ? AND member_id = ?`
+);
+const stmtCleanupEvents = db.prepare(`DELETE FROM processed_events WHERE created_at < ?`);
+
+const registerTx = db.transaction((row) => {
+  // 1端末トークン = 1会員: 他会員の紐付けを先に消してから upsert
+  stmtDeleteOtherMembers.run(row.device_token, row.member_id);
+  stmtUpsertDevice.run(row);
+});
+
 const stmtSeenEvent = db.prepare(`SELECT 1 FROM processed_events WHERE event_key = ?`);
 const stmtMarkEvent = db.prepare(
   `INSERT OR IGNORE INTO processed_events (event_key, created_at) VALUES (?, ?)`
@@ -94,7 +113,7 @@ const stmtMarkEvent = db.prepare(
 
 export const store = {
   registerDevice({ memberId, deviceToken, platform = 'ios' }) {
-    stmtUpsertDevice.run({
+    registerTx({
       member_id: String(memberId),
       device_token: deviceToken,
       platform,
@@ -106,17 +125,32 @@ export const store = {
     return stmtTokensByMember.all(String(memberId)).map((r) => r.device_token);
   },
 
+  // 端末登録解除。memberId 指定時はその会員との紐付けのみ、省略時はトークンごと削除。戻り値は削除件数
+  unregisterDevice({ deviceToken, memberId }) {
+    const r = memberId
+      ? stmtDeleteTokenMember.run(deviceToken, String(memberId))
+      : stmtDeleteToken.run(deviceToken);
+    return Number(r.changes);
+  },
+
   // APNs から無効と返ったトークンを掃除する
   removeToken(deviceToken) {
     stmtDeleteToken.run(deviceToken);
   },
 
-  // 既に処理済みのイベントなら true。未処理なら記録して false を返す
-  isDuplicateEvent(eventKey) {
-    if (!eventKey) return false;
-    if (stmtSeenEvent.get(eventKey)) return true;
-    stmtMarkEvent.run(eventKey, new Date().toISOString());
-    return false;
+  // 処理済みか(記録はしない)。処理成功後に markEventProcessed を呼ぶこと
+  isEventProcessed(eventKey) {
+    return !!eventKey && !!stmtSeenEvent.get(eventKey);
+  },
+
+  markEventProcessed(eventKey) {
+    if (eventKey) stmtMarkEvent.run(eventKey, new Date().toISOString());
+  },
+
+  // 古い processed_events を削除。戻り値は削除件数
+  cleanupProcessedEvents(retentionDays, now = Date.now()) {
+    const cutoff = new Date(now - retentionDays * 86400 * 1000).toISOString();
+    return Number(stmtCleanupEvents.run(cutoff).changes);
   },
 
   // 退会申請を記録
