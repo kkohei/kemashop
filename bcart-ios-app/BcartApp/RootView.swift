@@ -32,39 +32,92 @@ struct RootView: View {
     }
 }
 
+/// アイボリー・ミニマルのブランドカラー(Welcome / ロック画面で共通)。
+/// 注意: 16進→Double変換は必ず 255.0 で割ること(整数除算になるため 255 は不可)。
+enum KemaTheme {
+    private static func rgb(_ r: Int, _ g: Int, _ b: Int) -> Color {
+        Color(red: Double(r) / 255.0, green: Double(g) / 255.0, blue: Double(b) / 255.0)
+    }
+
+    static let ink   = rgb(0x1a, 0x16, 0x12)  // #1a1612
+    static let ivory = rgb(0xf7, 0xf1, 0xe6)  // #f7f1e6
+    static let gold  = rgb(0x9a, 0x7d, 0x4a)  // #9a7d4a
+
+    // 背景グラデーション
+    static let bgTop       = rgb(0xf7, 0xf1, 0xe6)  // #f7f1e6
+    static let bgMiddle    = rgb(0xf3, 0xea, 0xd9)  // #f3ead9
+    static let bgBottom    = rgb(0xef, 0xe4, 0xd0)  // #efe4d0
+    static let bgHighlight = rgb(0xff, 0xfd, 0xf8)  // #fffdf8
+}
+
+/// アイボリーの紙色グラデーション背景 + 上部中央のハイライト(Welcome / ロック画面で共通)。
+struct IvoryBackground: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                stops: [
+                    .init(color: KemaTheme.bgTop, location: 0),
+                    .init(color: KemaTheme.bgMiddle, location: 0.48),
+                    .init(color: KemaTheme.bgBottom, location: 1)
+                ],
+                startPoint: .top, endPoint: .bottom)
+
+            // 上部中央のやわらかなハイライト(ellipse 80% 60% at 50% 0%)
+            GeometryReader { geo in
+                RadialGradient(
+                    colors: [KemaTheme.bgHighlight, .clear],
+                    center: .init(x: 0.5, y: 0),
+                    startRadius: 0,
+                    endRadius: geo.size.width * 0.8)
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .scaleEffect(x: 1, y: 0.75, anchor: .top)
+            }
+        }
+        .ignoresSafeArea()
+    }
+}
+
+/// 公式ロゴ + 小さな「PRO SHOP」キャプション(Welcome / ロック画面で共通)。
+struct KemaLogoMark: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            // 公式ロゴ(黒・透過PNG)。再タイプセットや加工は行わないこと。
+            // 【Mac側セットアップ】git pull → Xcode で Assets.xcassets を開き、
+            // bcart-ios-app/BcartApp/Resources/kema-logo.imageset フォルダを Assets.xcassets にドラッグ。
+            // セット名が "kema-logo"(下の Image 名と完全一致)であることを確認して再ビルド。
+            Image("kema-logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 228)
+
+            // 公式ロゴの一部ではない小さなキャプション
+            Text("PRO SHOP")
+                .font(.system(size: 10, weight: .regular))
+                .tracking(4.8)
+                .padding(.leading, 4.8)   // 末尾の字間分を相殺して視覚的に中央へ
+                .foregroundStyle(KemaTheme.gold)
+                .padding(.top, 20)
+        }
+    }
+}
+
 /// 初回起動画面(アイボリー・ミニマル):
 /// アイボリーの紙色グラデーション背景 + 公式ロゴ + PRO SHOP キャプション + ログイン/新規登録ボタン。
 /// ライト/ダークモードに関わらず常にこのデザインで表示する。
 struct WelcomeView: View {
     @EnvironmentObject var appState: AppState
 
-    private let ink   = Color(red: 0x1a / 255.0, green: 0x16 / 255.0, blue: 0x12 / 255.0)  // #1a1612
-    private let ivory = Color(red: 0xf7 / 255.0, green: 0xf1 / 255.0, blue: 0xe6 / 255.0)  // #f7f1e6
-    private let gold  = Color(red: 0x9a / 255.0, green: 0x7d / 255.0, blue: 0x4a / 255.0)  // #9a7d4a
+    private let ink = KemaTheme.ink
+    private let ivory = KemaTheme.ivory
 
     var body: some View {
         ZStack {
-            background
+            IvoryBackground()
 
             VStack(spacing: 0) {
                 Spacer()
 
-                // 公式ロゴ(黒・透過PNG)。再タイプセットや加工は行わないこと。
-                // 【Mac側セットアップ】git pull → Xcode で Assets.xcassets を開き、
-                // bcart-ios-app/BcartApp/Resources/kema-logo.imageset フォルダを Assets.xcassets にドラッグ。
-                // セット名が "kema-logo"(下の Image 名と完全一致)であることを確認して再ビルド。
-                Image("kema-logo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 228)
-
-                // 公式ロゴの一部ではない小さなキャプション
-                Text("PRO SHOP")
-                    .font(.system(size: 10, weight: .regular))
-                    .tracking(4.8)
-                    .padding(.leading, 4.8)   // 末尾の字間分を相殺して視覚的に中央へ
-                    .foregroundStyle(gold)
-                    .padding(.top, 20)
+                KemaLogoMark()
 
                 Spacer()
 
@@ -106,30 +159,6 @@ struct WelcomeView: View {
         .ignoresSafeArea()
         // 常にアイボリーのデザイン。ステータスバーも黒文字になる
         .preferredColorScheme(.light)
-    }
-
-    private var background: some View {
-        ZStack {
-            LinearGradient(
-                stops: [
-                    .init(color: Color(red: 0xf7 / 255.0, green: 0xf1 / 255.0, blue: 0xe6 / 255.0), location: 0),
-                    .init(color: Color(red: 0xf3 / 255.0, green: 0xea / 255.0, blue: 0xd9 / 255.0), location: 0.48),
-                    .init(color: Color(red: 0xef / 255.0, green: 0xe4 / 255.0, blue: 0xd0 / 255.0), location: 1)
-                ],
-                startPoint: .top, endPoint: .bottom)
-
-            // 上部中央のやわらかなハイライト(ellipse 80% 60% at 50% 0%)
-            GeometryReader { geo in
-                RadialGradient(
-                    colors: [Color(red: 1, green: 0xfd / 255.0, blue: 0xf8 / 255.0), .clear],
-                    center: .init(x: 0.5, y: 0),
-                    startRadius: 0,
-                    endRadius: geo.size.width * 0.8)
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .scaleEffect(x: 1, y: 0.75, anchor: .top)
-            }
-        }
-        .ignoresSafeArea()
     }
 }
 
@@ -267,27 +296,43 @@ struct BarButton: View {
     }
 }
 
-/// ロック画面。Face ID / Touch ID で解錠する。
+/// ロック画面(アイボリー・ミニマル)。Welcome画面と同じ背景・公式ロゴ・PRO SHOP キャプションに、
+/// 黒塗りカプセルの「Face ID で解錠」ボタンを下部に配置。表示時に自動で生体認証を開始する。
+/// パスコードへのフォールバックはシステムの Face ID シート側で提供される。
 struct LockView: View {
     @EnvironmentObject var appState: AppState
 
     var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(.secondary)
-            Text("KEMASHOP")
-                .font(.title2.bold())
-            Button {
-                unlock()
-            } label: {
-                Label("Face ID で解錠", systemImage: "faceid")
-                    .frame(maxWidth: 220)
+        ZStack {
+            IvoryBackground()
+
+            VStack(spacing: 0) {
+                Spacer()
+
+                KemaLogoMark()
+
+                Spacer()
+
+                VStack(spacing: 14) {
+                    Button {
+                        unlock()
+                    } label: {
+                        Label("Face ID で解錠", systemImage: "faceid")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(KemaTheme.ivory)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 15)
+                            .background(KemaTheme.ink, in: Capsule())
+                    }
+                }
+                .frame(maxWidth: 440)   // iPhone Duo等の広い画面でボタンが間延びしないよう上限
+                .padding(.horizontal, 40)
+                .padding(.bottom, 60)
             }
-            .buttonStyle(.borderedProminent)
+            .frame(maxWidth: .infinity) // コンテンツは物理画面の中央寄せ
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea() // Duo内側画面でも物理画面の中央に揃える
+        .preferredColorScheme(.light)
         .onAppear { unlock() }
     }
 
