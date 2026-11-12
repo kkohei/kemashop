@@ -85,8 +85,166 @@ struct IvoryBackground: View {
     }
 }
 
+/// 動きのあるアイボリー背景(Welcome / ロック画面で共通)。
+/// 静的な IvoryBackground の上に、ごく淡い3層のアニメーションを重ねる:
+///  1. シャンパン/ベージュ系のぼかした光だまりが、20〜40秒周期でゆっくり漂う(メッシュグラデーション風)
+///  2. 約11秒ごとに、斜めの淡い光の帯(シーン)が一度だけ画面を横切る
+///  3. 小さな金色の粒子がゆっくり上へ浮かび、左右にかすかに揺れる
+/// 文字の可読性を損なわないよう、すべて低い不透明度に抑えている。
+/// 「視差効果を減らす(Reduce Motion)」がオンの場合は静止画で表示する。
+/// 画面が非表示・アプリが非アクティブの間はタイムラインを停止し、バッテリー消費を抑える。
+struct AnimatedIvoryBackground: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var isVisible = false
+    @State private var startDate = Date()
+
+    var body: some View {
+        ZStack {
+            IvoryBackground()
+
+            if reduceMotion {
+                // 静止フォールバック(動きなし・光の帯なし)
+                IvoryAmbientLayer(time: 6, showsSheen: false)
+            } else {
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0,
+                                        paused: !(isVisible && scenePhase == .active))) { timeline in
+                    IvoryAmbientLayer(time: timeline.date.timeIntervalSince(startDate), showsSheen: true)
+                }
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+        .onAppear { isVisible = true }
+        .onDisappear { isVisible = false }
+    }
+}
+
+/// AnimatedIvoryBackground の描画本体。time(秒)から各要素の位置を決定的に計算する(フレームごとの乱数なし)。
+private struct IvoryAmbientLayer: View {
+    let time: Double
+    let showsSheen: Bool
+
+    private struct Blob {
+        let color: Color
+        let alpha: Double
+        let center: CGPoint      // 画面に対する相対位置(0〜1)
+        let amplitude: CGSize    // 漂う幅(画面に対する相対値)
+        let period: CGSize       // x / y の周期(秒)
+        let phase: Double
+        let radius: CGFloat      // 画面の長辺に対する半径
+    }
+
+    private static func rgb(_ r: Int, _ g: Int, _ b: Int) -> Color {
+        Color(red: Double(r) / 255.0, green: Double(g) / 255.0, blue: Double(b) / 255.0)
+    }
+
+    private static let blobs: [Blob] = [
+        Blob(color: rgb(0xec, 0xd8, 0xb0), alpha: 0.42, center: CGPoint(x: 0.22, y: 0.28),
+             amplitude: CGSize(width: 0.16, height: 0.10), period: CGSize(width: 31, height: 23),
+             phase: 0.0, radius: 0.55),
+        Blob(color: rgb(0xff, 0xfb, 0xf2), alpha: 0.70, center: CGPoint(x: 0.78, y: 0.20),
+             amplitude: CGSize(width: 0.12, height: 0.12), period: CGSize(width: 27, height: 37),
+             phase: 1.7, radius: 0.50),
+        Blob(color: rgb(0xe6, 0xcf, 0xa2), alpha: 0.32, center: CGPoint(x: 0.70, y: 0.78),
+             amplitude: CGSize(width: 0.18, height: 0.08), period: CGSize(width: 39, height: 29),
+             phase: 3.1, radius: 0.60),
+        Blob(color: rgb(0xf3, 0xe4, 0xc6), alpha: 0.45, center: CGPoint(x: 0.25, y: 0.82),
+             amplitude: CGSize(width: 0.10, height: 0.12), period: CGSize(width: 25, height: 33),
+             phase: 4.6, radius: 0.48)
+    ]
+
+    private static let particleCount = 22
+    private static let particleColor = rgb(0xb8, 0x96, 0x5a)
+
+    /// 0〜1 の決定的な疑似乱数(粒子の初期配置用)
+    private static func seeded(_ i: Int, _ k: Int) -> Double {
+        let v = sin(Double(i) * 12.9898 + Double(k) * 78.233) * 43758.5453
+        return v - v.rounded(.down)
+    }
+
+    var body: some View {
+        Canvas { context, size in
+            let w = size.width
+            let h = size.height
+            guard w > 0, h > 0 else { return }
+            let longSide = max(w, h)
+            let twoPi = Double.pi * 2
+
+            // 1. 漂う光だまり
+            for blob in Self.blobs {
+                let x = w * (blob.center.x + blob.amplitude.width * CGFloat(sin(twoPi * time / Double(blob.period.width) + blob.phase)))
+                let y = h * (blob.center.y + blob.amplitude.height * CGFloat(cos(twoPi * time / Double(blob.period.height) + blob.phase)))
+                let r = longSide * blob.radius
+                let rect = CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)
+                let gradient = Gradient(stops: [
+                    .init(color: blob.color.opacity(blob.alpha), location: 0),
+                    .init(color: blob.color.opacity(blob.alpha * 0.45), location: 0.45),
+                    .init(color: blob.color.opacity(0), location: 1)
+                ])
+                context.fill(Path(ellipseIn: rect),
+                             with: .radialGradient(gradient, center: CGPoint(x: x, y: y),
+                                                   startRadius: 0, endRadius: r))
+            }
+
+            // 2. 斜めの光の帯(周期の前半 40% だけ横切り、残りは休止)
+            if showsSheen {
+                let cycle = 11.0
+                let progress = (time + 2.0).truncatingRemainder(dividingBy: cycle) / cycle
+                let sweep = progress / 0.4
+                if sweep < 1 {
+                    let eased = sweep * sweep * (3 - 2 * sweep)              // smoothstep
+                    let dir = CGVector(dx: 0.857, dy: 0.514)                 // 右下がりの斜め方向(単位ベクトル)
+                    let band = longSide * 0.32
+                    let travel = w * dir.dx + h * dir.dy
+                    let s = -band + (travel + band * 2) * CGFloat(eased)
+                    let c = CGPoint(x: dir.dx * s, y: dir.dy * s)
+                    let start = CGPoint(x: c.x - dir.dx * band / 2, y: c.y - dir.dy * band / 2)
+                    let end = CGPoint(x: c.x + dir.dx * band / 2, y: c.y + dir.dy * band / 2)
+                    let strength = 0.26 * sin(Double.pi * sweep)            // 入り/抜けをフェード
+                    let gradient = Gradient(stops: [
+                        .init(color: .white.opacity(0), location: 0),
+                        .init(color: .white.opacity(strength), location: 0.5),
+                        .init(color: .white.opacity(0), location: 1)
+                    ])
+                    context.fill(Path(CGRect(origin: .zero, size: size)),
+                                 with: .linearGradient(gradient, startPoint: start, endPoint: end))
+                }
+            }
+
+            // 3. ゆっくり浮かぶ金色の粒子
+            let travelH = Double(h) + 40
+            for i in 0..<Self.particleCount {
+                let baseX = Self.seeded(i, 1)
+                let offset = Self.seeded(i, 2)
+                let speed = Double(h) / (45 + 35 * Self.seeded(i, 3))   // 画面高さを45〜80秒で上昇
+                let sizePt = 1.5 + 1.6 * Self.seeded(i, 4)
+                let alpha = 0.14 + 0.22 * Self.seeded(i, 5)
+                let swayPeriod = 7 + 6 * Self.seeded(i, 6)
+
+                var yTravel = (time * speed + offset * travelH).truncatingRemainder(dividingBy: travelH)
+                if yTravel < 0 { yTravel += travelH }
+                let y = Double(h) + 20 - yTravel
+                let x = baseX * Double(w) + 14 * sin(twoPi * time / swayPeriod + offset * twoPi)
+
+                // 上下端に近いほど薄くする
+                let edge = min(max(y / Double(h), 0), 1)
+                let fade = min(edge / 0.15, (1 - edge) / 0.15, 1)
+                guard fade > 0 else { continue }
+
+                let rect = CGRect(x: x - sizePt / 2, y: y - sizePt / 2, width: sizePt, height: sizePt)
+                context.fill(Path(ellipseIn: rect), with: .color(Self.particleColor.opacity(alpha * fade)))
+            }
+        }
+    }
+}
+
 /// 公式ロゴ + 小さな「PRO SHOP」キャプション(Welcome / ロック画面で共通)。
 struct KemaLogoMark: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared = false
+
     var body: some View {
         VStack(spacing: 0) {
             // 公式ロゴ(黒・透過PNG)。再タイプセットや加工は行わないこと。
@@ -106,6 +264,12 @@ struct KemaLogoMark: View {
                 .foregroundStyle(KemaTheme.gold)
                 .padding(.top, 20)
         }
+        // 表示時のやわらかなフェードイン(不透明度のみ。ロゴの拡大縮小・変形はしない)
+        .opacity(reduceMotion || appeared ? 1 : 0)
+        .onAppear {
+            guard !appeared else { return }
+            withAnimation(.easeOut(duration: 1.0)) { appeared = true }
+        }
     }
 }
 
@@ -120,7 +284,7 @@ struct WelcomeView: View {
 
     var body: some View {
         ZStack {
-            IvoryBackground()
+            AnimatedIvoryBackground()
 
             VStack(spacing: 0) {
                 Spacer()
@@ -327,7 +491,7 @@ struct LockView: View {
 
     var body: some View {
         ZStack {
-            IvoryBackground()
+            AnimatedIvoryBackground()
 
             VStack(spacing: 0) {
                 Spacer()
