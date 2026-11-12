@@ -78,7 +78,7 @@ test('redactKey hides local part of emails', () => {
 // strict 既定 / 明示 false は config を再評価して確認(別プロセスで import)
 async function strictFor(value) {
   const { execFileSync } = await import('node:child_process');
-  const env = { PATH: process.env.PATH, RELAY_DB_PATH: ':memory:' };
+  const env = { PATH: process.env.PATH, RELAY_DB_PATH: ':memory:', DOTENV_CONFIG_PATH: '/nonexistent/.env' };
   if (value !== undefined) env.WEBHOOK_VERIFY_STRICT = value;
   const out = execFileSync(
     process.execPath,
